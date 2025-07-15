@@ -1,0 +1,420 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>The Infinite Bloom - Digital Poetry Book</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Georgia', serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            overflow: hidden;
+        }
+
+        .header {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            padding: 1rem 2rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 2px 20px rgba(0, 0, 0, 0.1);
+            position: relative;
+            z-index: 1000;
+        }
+
+        .logo-section {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .logo {
+            width: 40px;
+            height: 40px;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 1.2rem;
+            font-weight: bold;
+        }
+
+        .title-info h1 {
+            font-size: 1.5rem;
+            color: #2d3748;
+            margin-bottom: 0.25rem;
+        }
+
+        .title-info p {
+            font-size: 0.9rem;
+            color: #718096;
+        }
+
+        .user-section {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .user-info {
+            text-align: right;
+        }
+
+        .user-name {
+            font-size: 0.9rem;
+            font-weight: 600;
+            color: #2d3748;
+            margin-bottom: 0.25rem;
+        }
+
+        .user-email {
+            font-size: 0.8rem;
+            color: #718096;
+        }
+
+        .user-avatar {
+            width: 36px;
+            height: 36px;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: bold;
+            font-size: 0.9rem;
+        }
+
+        .flipbook-container {
+            height: calc(100vh - 80px);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 2rem;
+        }
+
+        .flipbook {
+            width: 90%;
+            max-width: 1200px;
+            height: 80vh;
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            overflow: hidden;
+            position: relative;
+        }
+
+        .page {
+            width: 100%;
+            height: 100%;
+            display: none;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            padding: 3rem;
+            text-align: center;
+            background: linear-gradient(135deg, #f7fafc 0%, #edf2f7 100%);
+        }
+
+        .page.active {
+            display: flex;
+        }
+
+        .page h2 {
+            font-size: 2.5rem;
+            color: #2d3748;
+            margin-bottom: 2rem;
+            font-weight: 300;
+        }
+
+        .page .poem {
+            font-size: 1.2rem;
+            line-height: 1.8;
+            color: #4a5568;
+            max-width: 600px;
+            font-style: italic;
+        }
+
+        .controls {
+            position: absolute;
+            bottom: 2rem;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            gap: 1rem;
+            z-index: 100;
+        }
+
+        .btn {
+            padding: 0.75rem 1.5rem;
+            background: rgba(255, 255, 255, 0.9);
+            border: none;
+            border-radius: 25px;
+            cursor: pointer;
+            font-size: 0.9rem;
+            font-weight: 500;
+            color: #2d3748;
+            transition: all 0.3s ease;
+            backdrop-filter: blur(10px);
+        }
+
+        .btn:hover {
+            background: rgba(255, 255, 255, 1);
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+        }
+
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .page-indicator {
+            position: absolute;
+            top: 2rem;
+            right: 2rem;
+            background: rgba(255, 255, 255, 0.9);
+            padding: 0.5rem 1rem;
+            border-radius: 20px;
+            font-size: 0.9rem;
+            color: #2d3748;
+            backdrop-filter: blur(10px);
+        }
+
+        @media (max-width: 768px) {
+            .header {
+                padding: 1rem;
+                flex-direction: column;
+                gap: 1rem;
+            }
+
+            .user-section {
+                order: -1;
+            }
+
+            .flipbook {
+                width: 95%;
+                height: 70vh;
+            }
+
+            .page {
+                padding: 2rem 1rem;
+            }
+
+            .page h2 {
+                font-size: 2rem;
+            }
+
+            .page .poem {
+                font-size: 1rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="logo-section">
+            <div class="logo">∞</div>
+            <div class="title-info">
+                <h1>The Infinite Bloom</h1>
+                <p>Evolving by Perspective • by Kismet Krystle</p>
+            </div>
+        </div>
+        <div class="user-section">
+            <div class="user-info">
+                <div class="user-name" id="userName">Welcome</div>
+                <div class="user-email" id="userEmail">reader@example.com</div>
+            </div>
+            <div class="user-avatar" id="userAvatar">U</div>
+        </div>
+    </div>
+
+    <div class="flipbook-container">
+        <div class="flipbook">
+            <div class="page-indicator">
+                Page <span id="currentPage">1</span> of <span id="totalPages">45</span>
+            </div>
+
+            <!-- Sample pages -->
+            <div class="page active">
+                <h2>Welcome to The Infinite Bloom</h2>
+                <div class="poem">
+                    A journey through consciousness,<br>
+                    Where words become bridges<br>
+                    Between what was and what could be.<br><br>
+                    
+                    Each poem a doorway,<br>
+                    Each verse a stepping stone<br>
+                    Across the infinite expanse<br>
+                    Of human experience.
+                </div>
+            </div>
+
+            <div class="page">
+                <h2>Awakening</h2>
+                <div class="poem">
+                    In the quiet moments before dawn,<br>
+                    When the world holds its breath,<br>
+                    I find myself listening<br>
+                    To the whispers of possibility.<br><br>
+                    
+                    The horizon blushes<br>
+                    With promises unspoken,<br>
+                    And I am reminded<br>
+                    That every ending<br>
+                    Is a beginning in disguise.
+                </div>
+            </div>
+
+            <div class="page">
+                <h2>Reflection</h2>
+                <div class="poem">
+                    Mirror, mirror on the wall,<br>
+                    Show me not my face,<br>
+                    But the depths of my soul,<br>
+                    The stories I've yet to tell.<br><br>
+                    
+                    In your silver surface<br>
+                    I see not just who I am,<br>
+                    But who I'm becoming—<br>
+                    A constellation of dreams<br>
+                    Waiting to be born.
+                </div>
+            </div>
+
+            <div class="page">
+                <h2>Transformation</h2>
+                <div class="poem">
+                    Like a butterfly emerging<br>
+                    From its chrysalis of doubt,<br>
+                    I spread wings I never knew I had<br>
+                    And take flight into the unknown.<br><br>
+                    
+                    The sky is vast,<br>
+                    The possibilities endless,<br>
+                    And I am no longer<br>
+                    The person I was yesterday.
+                </div>
+            </div>
+
+            <div class="page">
+                <h2>Connection</h2>
+                <div class="poem">
+                    We are all threads<br>
+                    In the same cosmic tapestry,<br>
+                    Woven together by invisible hands<br>
+                    That know no boundaries.<br><br>
+                    
+                    Your joy becomes my joy,<br>
+                    Your pain, my pain,<br>
+                    And in this sharing<br>
+                    We discover the truth:<br>
+                    We are never truly alone.
+                </div>
+            </div>
+
+            <div class="controls">
+                <button class="btn" id="prevBtn" onclick="previousPage()">← Previous</button>
+                <button class="btn" id="nextBtn" onclick="nextPage()">Next →</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let currentPageIndex = 0;
+        const pages = document.querySelectorAll('.page');
+        const totalPages = pages.length;
+        
+        // Load user information
+        function loadUserInfo() {
+            const userName = localStorage.getItem('infiniteBloomUserName') || 'Welcome Reader';
+            const userEmail = localStorage.getItem('infiniteBloomEmail') || 'reader@example.com';
+            
+            document.getElementById('userName').textContent = userName;
+            document.getElementById('userEmail').textContent = userName;
+            
+            // Set avatar to first letter of name
+            const firstLetter = userName.charAt(0).toUpperCase();
+            document.getElementById('userAvatar').textContent = firstLetter;
+        }
+
+        function updatePageDisplay() {
+            pages.forEach((page, index) => {
+                page.classList.toggle('active', index === currentPageIndex);
+            });
+            
+            document.getElementById('currentPage').textContent = currentPageIndex + 1;
+            document.getElementById('totalPages').textContent = totalPages;
+            
+            document.getElementById('prevBtn').disabled = currentPageIndex === 0;
+            document.getElementById('nextBtn').disabled = currentPageIndex === totalPages - 1;
+        }
+
+        function nextPage() {
+            if (currentPageIndex < totalPages - 1) {
+                currentPageIndex++;
+                updatePageDisplay();
+            }
+        }
+
+        function previousPage() {
+            if (currentPageIndex > 0) {
+                currentPageIndex--;
+                updatePageDisplay();
+            }
+        }
+
+        // Keyboard navigation
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'ArrowRight' || e.key === ' ') {
+                e.preventDefault();
+                nextPage();
+            } else if (e.key === 'ArrowLeft') {
+                e.preventDefault();
+                previousPage();
+            }
+        });
+
+        // Touch/swipe support for mobile
+        let startX = 0;
+        let endX = 0;
+
+        document.addEventListener('touchstart', function(e) {
+            startX = e.changedTouches[0].screenX;
+        });
+
+        document.addEventListener('touchend', function(e) {
+            endX = e.changedTouches[0].screenX;
+            handleSwipe();
+        });
+
+        function handleSwipe() {
+            const swipeThreshold = 50;
+            const diff = startX - endX;
+            
+            if (Math.abs(diff) > swipeThreshold) {
+                if (diff > 0) {
+                    nextPage(); // Swipe left = next page
+                } else {
+                    previousPage(); // Swipe right = previous page
+                }
+            }
+        }
+
+        // Initialize
+        loadUserInfo();
+        updatePageDisplay();
+    </script>
+</body>
+</html>

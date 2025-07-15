@@ -1,0 +1,28 @@
+{
+  "name": "The Infinite Bloom",
+  "short_name": "Infinite Bloom",
+  "description": "A transformative journey through poetry",
+  "start_url": "/pwa",
+  "scope": "/pwa/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#000000",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "/placeholder.svg?height=192&width=192",
+      "sizes": "192x192",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/placeholder.svg?height=512&width=512",
+      "sizes": "512x512",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["books", "education", "lifestyle"],
+  "lang": "en",
+  "dir": "ltr"
+}

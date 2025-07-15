@@ -5,27 +5,16 @@ export async function POST(request: NextRequest) {
   try {
     const { adminToken } = await request.json()
 
-    // Check admin token - be more explicit about the validation
-    const validAdminToken = process.env.ADMIN_TOKEN || process.env.NEXT_PUBLIC_ADMIN_TOKEN
+    const serverAdminToken = process.env.ADMIN_TOKEN
 
-    console.log("Admin token validation:", {
-      provided: adminToken ? "***provided***" : "missing",
-      envToken: validAdminToken ? "***exists***" : "missing",
-      match: adminToken === validAdminToken,
-    })
+    if (!serverAdminToken) {
+      console.error("ADMIN_TOKEN environment variable is not set on the server.")
+      return NextResponse.json({ error: "Server configuration error: ADMIN_TOKEN is not set." }, { status: 500 })
+    }
 
-    if (validAdminToken) {
-      if (adminToken !== validAdminToken) {
-        console.error("Admin token mismatch")
-        return NextResponse.json({ error: "Unauthorized - Invalid token" }, { status: 401 })
-      }
-    } else {
-      // Demo mode - accept any non-empty token
-      if (!adminToken || adminToken.trim() === "") {
-        console.error("No admin token provided in demo mode")
-        return NextResponse.json({ error: "Unauthorized - No token provided" }, { status: 401 })
-      }
-      console.log("Demo mode: accepting any non-empty token")
+    if (adminToken !== serverAdminToken) {
+      console.error("Unauthorized: Invalid admin token provided by client.")
+      return NextResponse.json({ error: "Unauthorized - Invalid token" }, { status: 401 })
     }
 
     try {

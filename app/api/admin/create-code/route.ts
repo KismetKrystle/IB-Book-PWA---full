@@ -5,13 +5,16 @@ export async function POST(request: NextRequest) {
   try {
     const { adminToken, type, maxUses, expiresInDays, notes, customerName, customerEmail } = await request.json()
 
-    // Basic admin token validation
-    const validAdminToken = process.env.ADMIN_TOKEN || process.env.NEXT_PUBLIC_ADMIN_TOKEN
-    if (validAdminToken && adminToken !== validAdminToken) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-    } else if (!validAdminToken && (!adminToken || adminToken.trim() === "")) {
-      // Demo mode fallback if ADMIN_TOKEN is not set
-      return NextResponse.json({ error: "Unauthorized - No token provided (demo mode)" }, { status: 401 })
+    const serverAdminToken = process.env.ADMIN_TOKEN
+
+    if (!serverAdminToken) {
+      console.error("ADMIN_TOKEN environment variable is not set on the server.")
+      return NextResponse.json({ error: "Server configuration error: ADMIN_TOKEN is not set." }, { status: 500 })
+    }
+
+    if (adminToken !== serverAdminToken) {
+      console.error("Unauthorized: Invalid admin token provided by client.")
+      return NextResponse.json({ error: "Unauthorized - Invalid token" }, { status: 401 })
     }
 
     let expiresAt: string | undefined

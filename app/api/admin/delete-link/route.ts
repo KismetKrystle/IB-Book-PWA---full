@@ -1,48 +1,43 @@
-import { type NextRequest, NextResponse } from "next/server"
-import { supabaseAdmin } from "@/lib/supabase"
+import { NextResponse } from "next/server"
+import { createClient } from "@/lib/supabase"
 
-export async function POST(request: NextRequest) {
+export async function DELETE(request: Request) {
+  const { id } = await request.json()
+  const adminToken = request.headers.get("Authorization")?.split(" ")[1]
+
+  if (process.env.ADMIN_TOKEN && adminToken !== process.env.ADMIN_TOKEN) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+  }
+
+  if (!id) {
+    return NextResponse.json({ error: "Purchase link ID is required" }, { status: 400 })
+  }
+
+  const supabase = createClient()
+
   try {
-    const { adminToken, linkId } = await request.json()
+    // First, delete associated access codes
+    const { error: deleteCodesError } = await supabase.from("access_codes").delete().eq("purchase_link_id", id)
 
-    const serverAdminToken = process.env.ADMIN_TOKEN
-
-    if (!serverAdminToken) {
-      console.error("ADMIN_TOKEN environment variable is not set on the server.")
-      return NextResponse.json({ error: "Server configuration error: ADMIN_TOKEN is not set." }, { status: 500 })
+    if (deleteCodesError) {
+      console.error("Error deleting associated access codes:", deleteCodesError)
+      return NextResponse.json({ error: deleteCodesError.message }, { status: 500 })
     }
 
-    if (adminToken !== serverAdminToken) {
-      console.error("Unauthorized: Invalid admin token provided by client.")
-      return NextResponse.json({ error: "Unauthorized - Invalid token" }, { status: 401 })
+    // Then, delete the purchase link
+    const { error: deleteLinkError } = await supabase.from("purchase_links").delete().eq("id", id)
+
+    if (deleteLinkError) {
+      console.error("Error deleting purchase link:", deleteLinkError)
+      return NextResponse.json({ error: deleteLinkError.message }, { status: 500 })
     }
 
-    // Check if it's the default link
-    const { data: link, error: fetchError } = await supabaseAdmin
-      .from("purchase_links")
-      .select("is_default")
-      .eq("id", linkId)
-      .single()
-
-    if (fetchError) {
-      console.error("Error fetching link for deletion:", fetchError)
-      return NextResponse.json({ success: false, error: fetchError.message }, { status: 500 })
-    }
-
-    if (link?.is_default) {
-      return NextResponse.json({ success: false, error: "Cannot delete default purchase link." }, { status: 400 })
-    }
-
-    const { error } = await supabaseAdmin.from("purchase_links").delete().eq("id", linkId)
-
-    if (error) {
-      console.error("Error deleting purchase link:", error)
-      return NextResponse.json({ success: false, error: error.message }, { status: 500 })
-    }
-
-    return NextResponse.json({ success: true })
+    return NextResponse.json(
+      { message: "Purchase link and associated access codes deleted successfully" },
+      { status: 200 },
+    )
   } catch (error) {
-    console.error("API error deleting purchase link:", error)
-    return NextResponse.json({ success: false, error: "Internal server error" }, { status: 500 })
+    console.error("Unexpected error deleting purchase link:", error)
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 })
   }
 }

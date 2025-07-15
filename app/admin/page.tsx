@@ -1,4 +1,32 @@
-"use client"
+import { createClient } from "@/lib/supabase"
+import { redirect } from "next/navigation"
+import { AdminDashboard } from "@/components/admin-dashboard"
+
+export const dynamic = "force-dynamic"
+
+export default async function AdminPage() {
+  const supabase = createClient()
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+
+  // For simplicity, we're using a basic check.
+  // In a real application, you'd want more robust role-based access control.
+  if (!user) {
+    redirect("/login") // Redirect to login if not authenticated
+  }
+
+  // You might want to check if the user has an 'admin' role in your database
+  // For example:
+  // const { data: profile, error } = await supabase.from('profiles').select('role').eq('id', user.id).single();
+  // if (error || profile?.role !== 'admin') {
+  //   redirect('/unauthorized');
+  // }
+
+  return <AdminDashboard />
+}
+;("use client")
 
 import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
@@ -99,7 +127,7 @@ interface SystemFailure {
   sessionId?: string
 }
 
-export default function AdminDashboard() {
+export function AdminDashboardComponent() {
   const [mounted, setMounted] = useState(false)
   const [adminToken, setAdminToken] = useState("")
   const [showToken, setShowToken] = useState(false)

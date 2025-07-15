@@ -1,32 +1,31 @@
-import { type NextRequest, NextResponse } from "next/server"
-import { supabaseAdmin } from "@/lib/supabase"
+import { NextResponse } from "next/server"
+import { createClient } from "@/lib/supabase"
 
-export async function POST(request: NextRequest) {
+export async function DELETE(request: Request) {
+  const { id } = await request.json()
+  const adminToken = request.headers.get("Authorization")?.split(" ")[1]
+
+  if (process.env.ADMIN_TOKEN && adminToken !== process.env.ADMIN_TOKEN) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+  }
+
+  if (!id) {
+    return NextResponse.json({ error: "Access code ID is required" }, { status: 400 })
+  }
+
+  const supabase = createClient()
+
   try {
-    const { adminToken, codeId } = await request.json()
-
-    const serverAdminToken = process.env.ADMIN_TOKEN
-
-    if (!serverAdminToken) {
-      console.error("ADMIN_TOKEN environment variable is not set on the server.")
-      return NextResponse.json({ error: "Server configuration error: ADMIN_TOKEN is not set." }, { status: 500 })
-    }
-
-    if (adminToken !== serverAdminToken) {
-      console.error("Unauthorized: Invalid admin token provided by client.")
-      return NextResponse.json({ error: "Unauthorized - Invalid token" }, { status: 401 })
-    }
-
-    const { error } = await supabaseAdmin.from("access_codes").delete().eq("id", codeId)
+    const { error } = await supabase.from("access_codes").delete().eq("id", id)
 
     if (error) {
       console.error("Error deleting access code:", error)
-      return NextResponse.json({ success: false, error: error.message }, { status: 500 })
+      return NextResponse.json({ error: error.message }, { status: 500 })
     }
 
-    return NextResponse.json({ success: true })
+    return NextResponse.json({ message: "Access code deleted successfully" }, { status: 200 })
   } catch (error) {
-    console.error("API error deleting access code:", error)
-    return NextResponse.json({ success: false, error: "Internal server error" }, { status: 500 })
+    console.error("Unexpected error deleting access code:", error)
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 })
   }
 }

@@ -101,7 +101,7 @@ export default function FlipbookPage() {
       {/* Flipbook Container */}
       <div className="w-full h-[calc(100vh-80px)]">
         <iframe
-          src="/flipbook-viewer.html" // This path refers to the public directory
+          src="/my-flipbook-content/index.html" // Update this path to your flipbook folder's index.html
           className="w-full h-full border-0"
           title="The Infinite Bloom - Digital Poetry Book"
           sandbox="allow-scripts allow-same-origin allow-forms"

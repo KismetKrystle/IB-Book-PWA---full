@@ -1,38 +1,69 @@
-import { createClient } from "@/lib/supabase"
-import { redirect } from "next/navigation"
+import { headers } from "next/headers"
 import { AdminDashboard } from "@/components/admin-dashboard" // Corrected import path
+import { Label } from "@/components/ui/label"
+import { Input } from "@/components/ui/input"
+import { Button } from "@/components/ui/button"
 
 export const dynamic = "force-dynamic"
 
 export default async function AdminPage() {
-  const supabase = createClient()
+  const headersList = headers()
+  const authHeader = headersList.get("authorization")
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+  // Basic authentication check for the admin dashboard
+  // In a real application, you'd use a more robust authentication system (e.g., NextAuth.js, Clerk, Supabase Auth)
+  const ADMIN_TOKEN = process.env.ADMIN_TOKEN
 
-  // For simplicity, we're using a basic check.
-  // In a real application, you'd want more robust role-based access control.
-  if (!user) {
-    redirect("/login") // Redirect to login if not authenticated
+  if (!ADMIN_TOKEN) {
+    console.error("ADMIN_TOKEN environment variable is not set.")
+    // In production, you might want to redirect to an error page or show a generic message
+    return (
+      <div className="flex items-center justify-center min-h-screen bg-gray-100">
+        <p className="text-red-500">Server configuration error: ADMIN_TOKEN is missing.</p>
+      </div>
+    )
   }
 
-  // You might want to check if the user has an 'admin' role in your database
-  // For example:
-  // const { data: profile, error } = await supabase.from('profiles').select('role').eq('id', user.id).single();
-  // if (error || profile?.role !== 'admin') {
-  //   redirect('/unauthorized');
-  // }
+  // Check for a simple token in the Authorization header
+  // For a more secure setup, consider a proper login flow and session management
+  if (!authHeader || !authHeader.startsWith("Bearer ") || authHeader.split(" ")[1] !== ADMIN_TOKEN) {
+    // If not authenticated, redirect to a login page or show an unauthorized message
+    // For simplicity, we'll just show a basic login form here.
+    // In a real app, you'd have a dedicated login route.
+    return (
+      <div className="flex items-center justify-center min-h-screen bg-gray-100">
+        <div className="bg-white p-8 rounded-lg shadow-md w-96">
+          <h1 className="text-2xl font-bold mb-6 text-center">Admin Login</h1>
+          <form action="/api/admin/login" method="POST" className="space-y-4">
+            <div>
+              <Label htmlFor="username">Username</Label>
+              <Input id="username" name="username" type="text" required />
+            </div>
+            <div>
+              <Label htmlFor="password">Password</Label>
+              <Input id="password" name="password" type="password" required />
+            </div>
+            <Button type="submit" className="w-full">
+              Login
+            </Button>
+          </form>
+          <p className="mt-4 text-sm text-center text-gray-500">
+            This is a basic authentication for demonstration.
+            <br />
+            Use the `ADMIN_TOKEN` as password.
+          </p>
+        </div>
+      </div>
+    )
+  }
 
+  // If authenticated, render the Admin Dashboard client component
   return <AdminDashboard />
 }
 ;("use client")
 
 import { useState, useEffect } from "react"
-import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"

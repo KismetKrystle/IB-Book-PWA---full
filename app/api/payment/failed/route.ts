@@ -45,3 +45,7 @@ export async function POST(request: NextRequest) {
     )
   }
 }
+
+export async function GET() {
+  return NextResponse.json({ message: "Payment failed or was cancelled." }, { status: 200 })
+}

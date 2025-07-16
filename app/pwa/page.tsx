@@ -1,7 +1,7 @@
 "use client"
 
 import type React from "react"
-
+import { useRouter } from "next/navigation"
 import { useState, useEffect } from "react"
 import { useSearchParams } from "next/navigation"
 import { Button } from "@/components/ui/button"
@@ -9,6 +9,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Loader2, BookOpen, Headphones, Infinity, Eye, EyeOff, Mail, User, Phone } from "lucide-react"
+import { useToast } from "@/components/ui/use-toast"
 
 interface PurchaseLink {
   id: string
@@ -22,6 +23,8 @@ interface PurchaseLink {
 
 export default function PWAHomePage() {
   const searchParams = useSearchParams()
+  const router = useRouter()
+  const { toast } = useToast()
   const [step, setStep] = useState<"landing" | "payment" | "access" | "credentials">("landing")
   const [loading, setLoading] = useState(true)
   const [credentialsLoading, setCredentialsLoading] = useState(false)
@@ -102,7 +105,7 @@ export default function PWAHomePage() {
       if (token && userEmail && userEmail.includes("@") && userPassword && authExpiry) {
         const expiryDate = new Date(authExpiry)
         if (expiryDate > new Date()) {
-          window.location.href = "/pwa/reader"
+          router.push("/pwa/reader")
           return
         } else {
           // Clear expired auth but preserve email for re-login
@@ -134,7 +137,7 @@ export default function PWAHomePage() {
           })
       }, 1000)
     }
-  }, [searchParams, purchaseLinks])
+  }, [searchParams, purchaseLinks, router])
 
   const handlePurchaseLink = (slug: string) => {
     window.location.href = `/pwa/buy/${slug}`
@@ -224,7 +227,7 @@ export default function PWAHomePage() {
       console.log("Credentials saved, redirecting to reader...") // Debug log
 
       // Redirect to reader
-      window.location.href = "/pwa/reader"
+      router.push("/pwa/reader")
     } catch (err) {
       console.error("Credentials setup error:", err)
       setError("Failed to set up account. Please try again.")
@@ -338,65 +341,43 @@ export default function PWAHomePage() {
 
   if (step === "access") {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-sky-200 via-blue-100 to-purple-100 flex items-center justify-center p-4">
-        <Card className="w-full max-w-md shadow-2xl border-0 bg-white/90 backdrop-blur">
+      <div className="flex min-h-screen items-center justify-center bg-gray-100 p-4">
+        <Card className="w-full max-w-md">
           <CardHeader className="text-center">
-            <CardTitle className="text-xl">Enter Access Code</CardTitle>
-            <CardDescription>
-              {demoMode ? "Use your access code below:" : "Enter the access code you received after purchase"}
+            <CardTitle className="text-3xl font-bold">Access Infinite Bloom</CardTitle>
+            <CardDescription className="mt-2 text-lg text-gray-600">
+              Enter your access code to view the flipbook.
             </CardDescription>
           </CardHeader>
-
-          <CardContent className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="accessCode">Access Code</Label>
-              <Input
-                id="accessCode"
-                type="text"
-                placeholder="Enter your access code"
-                value={accessCode}
-                onChange={(e) => {
-                  const value = e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, "")
-                  setAccessCode(value)
-                }}
-                onFocus={handleInputFocus}
-                onClick={handleInputClick}
-                onKeyPress={handleKeyPress}
-                className="text-center font-mono text-lg border-2 border-gray-300 focus:border-purple-500 focus:ring-2 focus:ring-purple-200"
-                autoComplete="off"
-                autoFocus
-                spellCheck={false}
-                maxLength={12}
-                style={{
-                  WebkitUserSelect: "text",
-                  userSelect: "text",
-                  WebkitTouchCallout: "default",
-                  WebkitTapHighlightColor: "transparent",
-                }}
-              />
-              <p className="text-xs text-gray-500">Try: DEMO123 or PROMO2024</p>
-            </div>
-
-            {error && <p className="text-red-500 text-sm text-center">{error}</p>}
-
-            <Button
-              onClick={handleAccessCode}
-              disabled={loading || !accessCode}
-              className="w-full bg-gradient-to-r from-purple-500 to-blue-500 hover:from-purple-600 hover:to-blue-600"
-            >
-              {loading ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Validating...
-                </>
-              ) : (
-                "Validate Code"
-              )}
-            </Button>
-
-            <Button variant="link" onClick={() => setStep("landing")} className="w-full text-sm">
-              Back to Purchase Options
-            </Button>
+          <CardContent className="p-6">
+            <form onSubmit={handleAccessCode} className="space-y-6">
+              <div className="space-y-2">
+                <Label htmlFor="accessCode">Access Code</Label>
+                <Input
+                  id="accessCode"
+                  type="text"
+                  placeholder="e.g., DEMO123"
+                  value={accessCode}
+                  onChange={(e) => {
+                    const value = e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, "")
+                    setAccessCode(value)
+                  }}
+                  required
+                  className="text-center text-lg tracking-widest uppercase"
+                />
+              </div>
+              {error && <p className="text-red-500 text-sm text-center">{error}</p>}
+              <Button type="submit" className="w-full py-3 text-lg" disabled={loading}>
+                {loading ? (
+                  <>
+                    <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                    Verifying...
+                  </>
+                ) : (
+                  "Access Flipbook"
+                )}
+              </Button>
+            </form>
           </CardContent>
         </Card>
       </div>

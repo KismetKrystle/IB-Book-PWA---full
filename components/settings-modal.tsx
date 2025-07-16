@@ -7,8 +7,16 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog"
 import { Separator } from "@/components/ui/separator"
+import { Switch } from "@/components/ui/switch"
 import {
   User,
   Mail,
@@ -25,6 +33,7 @@ import {
   Database,
   Moon,
   Sun,
+  Settings,
 } from "lucide-react"
 
 interface SettingsModalProps {
@@ -56,6 +65,7 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
   const [loading, setLoading] = useState(false)
   const [message, setMessage] = useState("")
   const [theme, setTheme] = useState<"light" | "dark">("light")
+  const [darkMode, setDarkMode] = useState(false) // Example setting
 
   useEffect(() => {
     if (isOpen) {
@@ -232,8 +242,20 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
     }
   }
 
+  const handleDarkModeChange = (checked: boolean) => {
+    setDarkMode(checked)
+    // Implement actual dark mode toggle logic here (e.g., add/remove class from <html>)
+    document.documentElement.classList.toggle("dark", checked)
+  }
+
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
+      <DialogTrigger asChild>
+        <Button variant="ghost" size="sm">
+          <Settings className="h-4 w-4" />
+          <span className="sr-only">Settings</span>
+        </Button>
+      </DialogTrigger>
       <DialogContent className="sm:max-w-[600px] max-h-[80vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
@@ -392,6 +414,15 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                       <Moon className="w-4 h-4" />
                       Dark
                     </Button>
+                  </div>
+                </div>
+
+                <Separator />
+
+                <div className="space-y-3">
+                  <Label className="text-sm font-medium">Dark Mode</Label>
+                  <div className="flex gap-3">
+                    <Switch id="darkMode" checked={darkMode} onCheckedChange={handleDarkModeChange} />
                   </div>
                 </div>
 

@@ -1,179 +1,166 @@
-export interface AccessCode {
-  code: string
-  maxUses: number
-  currentUses: number
-  createdAt: string
-  expiresAt?: string
-  devices: string[] // Device fingerprints
-  type: "purchase" | "promotional"
-  notes?: string
+import { createClient } from "./supabase"
+
+export async function validateAccessCode(code: string, deviceFingerprint: string) {
+  const supabase = createClient()
+
+  const { data: accessCode, error: codeError } = await supabase
+    .from("access_codes")
+    .select("*")
+    .eq("code", code)
+    .single()
+
+  if (codeError || !accessCode) {
+    return { success: false, message: "Invalid access code." }
+  }
+
+  if (!accessCode.is_active) {
+    return { success: false, message: "Access code is inactive." }
+  }
+
+  if (accessCode.expires_at && new Date(accessCode.expires_at) < new Date()) {
+    return { success: false, message: "Access code has expired." }
+  }
+
+  // Check if device is already registered
+  const { data: existingDevice, error: deviceError } = await supabase
+    .from("access_code_devices")
+    .select("*")
+    .eq("access_code_id", accessCode.id)
+    .eq("device_fingerprint", deviceFingerprint)
+    .single()
+
+  if (existingDevice) {
+    return {
+      success: true,
+      message: "Device already registered. Access granted.",
+      codeInfo: accessCode,
+    }
+  }
+
+  // Check usage limit
+  if (accessCode.usage_limit !== null && accessCode.current_usage >= accessCode.usage_limit) {
+    return { success: false, message: "Access code has reached its maximum usage limit." }
+  }
+
+  // Register new device and increment usage
+  const { error: insertDeviceError } = await supabase.from("access_code_devices").insert({
+    access_code_id: accessCode.id,
+    device_fingerprint: deviceFingerprint,
+  })
+
+  if (insertDeviceError) {
+    console.error("Error registering device:", insertDeviceError.message)
+    return { success: false, message: "Failed to register device." }
+  }
+
+  const { data: updatedAccessCode, error: updateError } = await supabase
+    .from("access_codes")
+    .update({ current_usage: accessCode.current_usage + 1 })
+    .eq("id", accessCode.id)
+    .select()
+    .single()
+
+  if (updateError || !updatedAccessCode) {
+    console.error("Error updating access code usage:", updateError?.message || "Failed to update usage.")
+    return { success: false, message: "Failed to update access code usage." }
+  }
+
+  return {
+    success: true,
+    message: "Access granted. Device registered.",
+    codeInfo: updatedAccessCode,
+  }
 }
 
-// In production, this would be a real database
-// For now, we'll use localStorage with a fallback
-class AccessCodeManager {
-  private static instance: AccessCodeManager
-  private codes: Map<string, AccessCode> = new Map()
-
-  static getInstance(): AccessCodeManager {
-    if (!AccessCodeManager.instance) {
-      AccessCodeManager.instance = new AccessCodeManager()
-    }
-    return AccessCodeManager.instance
-  }
-
-  constructor() {
-    this.loadCodes()
-  }
-
-  private loadCodes() {
-    try {
-      const stored = localStorage.getItem("infiniteBloomAccessCodes")
-      if (stored) {
-        const codesArray = JSON.parse(stored)
-        this.codes = new Map(codesArray)
-      } else {
-        // Initialize with some demo codes
-        this.initializeDemoCodes()
-      }
-    } catch (error) {
-      console.error("Failed to load access codes:", error)
-      this.initializeDemoCodes()
-    }
-  }
-
-  private saveCodes() {
-    try {
-      const codesArray = Array.from(this.codes.entries())
-      localStorage.setItem("infiniteBloomAccessCodes", JSON.stringify(codesArray))
-    } catch (error) {
-      console.error("Failed to save access codes:", error)
-    }
-  }
-
-  private initializeDemoCodes() {
-    const demoCodes: AccessCode[] = [
-      {
-        code: "DEMO123",
-        maxUses: 3,
-        currentUses: 0,
-        devices: [],
-        createdAt: new Date().toISOString(),
-        type: "promotional",
-        notes: "Demo code for testing",
-      },
-      {
-        code: "PROMO2024",
-        maxUses: 3,
-        currentUses: 0,
-        devices: [],
-        createdAt: new Date().toISOString(),
-        type: "promotional",
-        notes: "Promotional giveaway code",
-      },
-    ]
-
-    demoCodes.forEach((code) => {
-      this.codes.set(code.code, code)
-    })
-    this.saveCodes()
-  }
-
-  generateDeviceFingerprint(): string {
-    // Simple device fingerprinting
-    const canvas = document.createElement("canvas")
-    const ctx = canvas.getContext("2d")
-    ctx!.textBaseline = "top"
-    ctx!.font = "14px Arial"
-    ctx!.fillText("Device fingerprint", 2, 2)
-
-    const fingerprint = [
-      navigator.userAgent,
-      navigator.language,
-      screen.width + "x" + screen.height,
-      new Date().getTimezoneOffset(),
-      canvas.toDataURL(),
-    ].join("|")
-
-    // Simple hash
-    let hash = 0
-    for (let i = 0; i < fingerprint.length; i++) {
-      const char = fingerprint.charCodeAt(i)
-      hash = (hash << 5) - hash + char
-      hash = hash & hash // Convert to 32-bit integer
-    }
-    return Math.abs(hash).toString(36)
-  }
-
-  validateCode(code: string, deviceFingerprint: string): { valid: boolean; message: string; accessCode?: AccessCode } {
-    const accessCode = this.codes.get(code.toUpperCase())
-
-    if (!accessCode) {
-      return { valid: false, message: "Invalid access code" }
-    }
-
-    // Check if code has expired
-    if (accessCode.expiresAt && new Date(accessCode.expiresAt) < new Date()) {
-      return { valid: false, message: "Access code has expired" }
-    }
-
-    // Check if device already used this code
-    if (accessCode.devices.includes(deviceFingerprint)) {
-      return { valid: true, message: "Welcome back! Device already registered.", accessCode }
-    }
-
-    // Check if max uses reached
-    if (accessCode.currentUses >= accessCode.maxUses) {
-      return { valid: false, message: "Access code has reached maximum number of devices (3)" }
-    }
-
-    // Valid new device usage
-    accessCode.devices.push(deviceFingerprint)
-    accessCode.currentUses++
-    this.codes.set(code.toUpperCase(), accessCode)
-    this.saveCodes()
-
-    return { valid: true, message: "Access granted! Device registered.", accessCode }
-  }
-
-  createCode(type: "purchase" | "promotional", maxUses = 3, expiresInDays?: number, notes?: string): AccessCode {
-    const code = this.generateAccessCode()
-    const expiresAt = expiresInDays
-      ? new Date(Date.now() + expiresInDays * 24 * 60 * 60 * 1000).toISOString()
-      : undefined
-
-    const accessCode: AccessCode = {
+export async function createAccessCode(
+  code: string,
+  usageLimit: number | null,
+  expiresAt: string | null,
+  isActive: boolean,
+  purchaseLinkId: string | null,
+  customerName: string | null,
+  customerEmail: string | null,
+  transactionId: string | null,
+  amountPaid: number | null,
+  currency: string | null,
+  paymentProcessor: string | null,
+  purchaseDate: string | null,
+) {
+  const supabase = createClient()
+  const { data, error } = await supabase
+    .from("access_codes")
+    .insert({
       code,
-      maxUses,
-      currentUses: 0,
-      devices: [],
-      createdAt: new Date().toISOString(),
-      expiresAt,
-      type,
-      notes,
-    }
+      usage_limit: usageLimit,
+      expires_at: expiresAt,
+      is_active: isActive,
+      purchase_link_id: purchaseLinkId,
+      customer_name: customerName,
+      customer_email: customerEmail,
+      transaction_id: transactionId,
+      amount_paid: amountPaid,
+      currency: currency,
+      payment_processor: paymentProcessor,
+      purchase_date: purchaseDate,
+    })
+    .select()
+    .single()
 
-    this.codes.set(code, accessCode)
-    this.saveCodes()
-    return accessCode
+  if (error) {
+    throw new Error(error.message)
   }
-
-  private generateAccessCode(): string {
-    const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
-    let result = ""
-    for (let i = 0; i < 8; i++) {
-      result += chars.charAt(Math.floor(Math.random() * chars.length))
-    }
-    return result
-  }
-
-  getAllCodes(): AccessCode[] {
-    return Array.from(this.codes.values())
-  }
-
-  getCodeStats(code: string): AccessCode | undefined {
-    return this.codes.get(code.toUpperCase())
-  }
+  return data
 }
 
-export default AccessCodeManager
+export async function updateAccessCode(
+  id: string,
+  updates: {
+    usage_limit?: number | null
+    expires_at?: string | null
+    is_active?: boolean
+    customer_name?: string | null
+    customer_email?: string | null
+  },
+) {
+  const supabase = createClient()
+  const { data, error } = await supabase.from("access_codes").update(updates).eq("id", id).select().single()
+
+  if (error) {
+    throw new Error(error.message)
+  }
+  return data
+}
+
+export async function deleteAccessCode(id: string) {
+  const supabase = createClient()
+  const { error } = await supabase.from("access_codes").delete().eq("id", id)
+
+  if (error) {
+    throw new Error(error.message)
+  }
+  return { success: true }
+}
+
+export async function listAccessCodes() {
+  const supabase = createClient()
+  const { data, error } = await supabase
+    .from("access_codes")
+    .select(
+      `
+      *,
+      purchase_links (
+        slug,
+        price,
+        currency,
+        description,
+        is_free
+      )
+    `,
+    )
+    .order("created_at", { ascending: false })
+
+  if (error) {
+    throw new Error(error.message)
+  }
+  return data
+}

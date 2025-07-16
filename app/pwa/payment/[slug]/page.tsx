@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { useParams } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -22,8 +22,9 @@ interface PurchaseLink {
   wise_enabled: boolean
 }
 
-export default function PaymentPage() {
-  const params = useParams()
+export default function PaymentPage({ params }: { params: { slug: string } }) {
+  const router = useRouter()
+  const searchParams = useSearchParams()
   const slug = params.slug as string
 
   const [purchaseLink, setPurchaseLink] = useState<PurchaseLink | null>(null)
@@ -35,10 +36,33 @@ export default function PaymentPage() {
   const [error, setError] = useState("")
   const [success, setSuccess] = useState(false)
   const [accessCode, setAccessCode] = useState("")
+  const [status, setStatus] = useState<"success" | "cancelled" | "loading" | "error">("loading")
+  const [message, setMessage] = useState("Processing your payment...")
 
   useEffect(() => {
-    loadPurchaseLink()
-  }, [slug])
+    const paymentStatus = searchParams.get("payment")
+    if (paymentStatus === "success") {
+      setStatus("success")
+      setMessage("Payment successful! You can now access the content.")
+      // Optionally, trigger backend logic to finalize access code creation/activation
+      // and then redirect to the reader.
+      setTimeout(() => {
+        router.push("/pwa/reader")
+      }, 3000)
+    } else if (paymentStatus === "cancelled") {
+      setStatus("cancelled")
+      setMessage("Payment cancelled. You can try again or return to the homepage.")
+    } else {
+      setStatus("error")
+      setMessage("Invalid payment status. Please return to the homepage.")
+    }
+  }, [searchParams, router])
+
+  useEffect(() => {
+    if (status === "loading") {
+      loadPurchaseLink()
+    }
+  }, [slug, status])
 
   const loadPurchaseLink = async () => {
     try {
@@ -136,18 +160,7 @@ export default function PaymentPage() {
     }
   }
 
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-sky-200 via-blue-100 to-purple-100 flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-500 mx-auto mb-4"></div>
-          <p className="text-gray-600">Loading payment details...</p>
-        </div>
-      </div>
-    )
-  }
-
-  if (success) {
+  if (status === "success") {
     return (
       <div className="min-h-screen bg-gradient-to-br from-sky-200 via-blue-100 to-purple-100 flex items-center justify-center p-4">
         <Card className="w-full max-w-md shadow-2xl border-0 bg-white/90 backdrop-blur">
@@ -186,6 +199,50 @@ export default function PaymentPage() {
             </Button>
           </CardContent>
         </Card>
+      </div>
+    )
+  }
+
+  if (status === "cancelled") {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-sky-200 via-blue-100 to-purple-100 flex items-center justify-center p-4">
+        <Card className="w-full max-w-md">
+          <CardContent className="text-center py-8">
+            <p className="text-red-600 mb-4">{message}</p>
+            <Button onClick={() => router.back()} variant="outline" className="w-full py-3 text-lg">
+              Try Payment Again
+            </Button>
+            <Button onClick={() => router.push("/")} className="w-full py-3 text-lg mt-2">
+              Return to Homepage
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    )
+  }
+
+  if (status === "error") {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-sky-200 via-blue-100 to-purple-100 flex items-center justify-center p-4">
+        <Card className="w-full max-w-md">
+          <CardContent className="text-center py-8">
+            <p className="text-red-600 mb-4">{message}</p>
+            <Button onClick={() => router.push("/")} className="w-full py-3 text-lg">
+              Return to Homepage
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    )
+  }
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-sky-200 via-blue-100 to-purple-100 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-500 mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading payment details...</p>
+        </div>
       </div>
     )
   }

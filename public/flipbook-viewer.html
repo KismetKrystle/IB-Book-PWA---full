@@ -3,9 +3,18 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>The Infinite Bloom - Digital Poetry Book</title>
+    <title>Infinite Bloom Flipbook Viewer</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
     <style>
+        body, html {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background-color: #f0f0f0; /* Light gray background */
+        }
+
         * {
             margin: 0;
             padding: 0;
@@ -220,6 +229,12 @@
                 font-size: 1rem;
             }
         }
+
+        iframe {
+            width: 100%;
+            height: 100%;
+            border: none;
+        }
     </style>
 </head>
 <body>
@@ -241,94 +256,9 @@
     </div>
 
     <div class="flipbook-container">
-        <div class="flipbook">
-            <div class="page-indicator">
-                Page <span id="currentPage">1</span> of <span id="totalPages">45</span>
-            </div>
-
-            <!-- Sample pages -->
-            <div class="page active">
-                <h2>Welcome to The Infinite Bloom</h2>
-                <div class="poem">
-                    A journey through consciousness,<br>
-                    Where words become bridges<br>
-                    Between what was and what could be.<br><br>
-                    
-                    Each poem a doorway,<br>
-                    Each verse a stepping stone<br>
-                    Across the infinite expanse<br>
-                    Of human experience.
-                </div>
-            </div>
-
-            <div class="page">
-                <h2>Awakening</h2>
-                <div class="poem">
-                    In the quiet moments before dawn,<br>
-                    When the world holds its breath,<br>
-                    I find myself listening<br>
-                    To the whispers of possibility.<br><br>
-                    
-                    The horizon blushes<br>
-                    With promises unspoken,<br>
-                    And I am reminded<br>
-                    That every ending<br>
-                    Is a beginning in disguise.
-                </div>
-            </div>
-
-            <div class="page">
-                <h2>Reflection</h2>
-                <div class="poem">
-                    Mirror, mirror on the wall,<br>
-                    Show me not my face,<br>
-                    But the depths of my soul,<br>
-                    The stories I've yet to tell.<br><br>
-                    
-                    In your silver surface<br>
-                    I see not just who I am,<br>
-                    But who I'm becoming—<br>
-                    A constellation of dreams<br>
-                    Waiting to be born.
-                </div>
-            </div>
-
-            <div class="page">
-                <h2>Transformation</h2>
-                <div class="poem">
-                    Like a butterfly emerging<br>
-                    From its chrysalis of doubt,<br>
-                    I spread wings I never knew I had<br>
-                    And take flight into the unknown.<br><br>
-                    
-                    The sky is vast,<br>
-                    The possibilities endless,<br>
-                    And I am no longer<br>
-                    The person I was yesterday.
-                </div>
-            </div>
-
-            <div class="page">
-                <h2>Connection</h2>
-                <div class="poem">
-                    We are all threads<br>
-                    In the same cosmic tapestry,<br>
-                    Woven together by invisible hands<br>
-                    That know no boundaries.<br><br>
-                    
-                    Your joy becomes my joy,<br>
-                    Your pain, my pain,<br>
-                    And in this sharing<br>
-                    We discover the truth:<br>
-                    We are never truly alone.
-                </div>
-            </div>
-
-            <div class="controls">
-                <button class="btn" id="prevBtn" onclick="previousPage()">← Previous</button>
-                <button class="btn" id="nextBtn" onclick="nextPage()">Next →</button>
-            </div>
-        </div>
+        <!-- This iframe will load your FlipHTML5 content -->
+        <!-- Replace 'YOUR_FLIPHTML5_EMBED_URL' with the actual embed URL provided by FlipHTML5 -->
+        <iframe src="https://online.fliphtml5.com/your-fliphtml5-content-embed-url/your-book-id/" allowFullScreen="true" allow="autoplay"></iframe>
     </div>
 
     <script>
@@ -342,7 +272,7 @@
             const userEmail = localStorage.getItem('infiniteBloomEmail') || 'reader@example.com';
             
             document.getElementById('userName').textContent = userName;
-            document.getElementById('userEmail').textContent = userName;
+            document.getElementById('userEmail').textContent = userEmail;
             
             // Set avatar to first letter of name
             const firstLetter = userName.charAt(0).toUpperCase();

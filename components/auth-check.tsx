@@ -4,47 +4,41 @@ import type React from "react"
 
 import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
+import { Loader2 } from "lucide-react"
 
 interface AuthCheckProps {
   children: React.ReactNode
-  redirectTo?: string
+  redirectPath?: string
 }
 
-export function AuthCheck({ children, redirectTo = "/" }: AuthCheckProps) {
+export function AuthCheck({ children, redirectPath = "/pwa" }: AuthCheckProps) {
   const [isAuthenticated, setIsAuthenticated] = useState(false)
   const [loading, setLoading] = useState(true)
   const router = useRouter()
 
   useEffect(() => {
-    const checkAuth = () => {
-      const token = localStorage.getItem("infiniteBloomToken")
-      const password = localStorage.getItem("infiniteBloomPassword")
-      const authExpiry = localStorage.getItem("infiniteBloomAuthExpiry")
-
-      if (token && password && authExpiry) {
-        const expiryDate = new Date(authExpiry)
-        if (expiryDate > new Date()) {
-          setIsAuthenticated(true)
-          setLoading(false)
-          return
-        }
-      }
-
-      // Not authenticated or expired
-      localStorage.clear()
-      router.push(redirectTo)
+    const sessionToken = localStorage.getItem("sessionToken")
+    if (sessionToken) {
+      // In a real application, you would validate this token with your backend
+      // For this demo, we'll assume any token means authenticated.
+      setIsAuthenticated(true)
+    } else {
+      router.push(redirectPath)
     }
-
-    checkAuth()
-  }, [router, redirectTo])
+    setLoading(false)
+  }, [router, redirectPath])
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-500"></div>
+      <div className="flex min-h-screen items-center justify-center bg-gray-100">
+        <Loader2 className="h-10 w-10 animate-spin text-gray-500" />
       </div>
     )
   }
 
-  return isAuthenticated ? <>{children}</> : null
+  if (!isAuthenticated) {
+    return null // Or a small loading spinner, as redirect is happening
+  }
+
+  return <>{children}</>
 }

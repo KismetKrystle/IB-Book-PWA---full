@@ -2,43 +2,34 @@ import { NextResponse } from "next/server"
 import type { NextRequest } from "next/server"
 
 export function middleware(request: NextRequest) {
-  const { pathname } = request.nextUrl
+  // Example: Protect admin routes with basic authentication
+  if (request.nextUrl.pathname.startsWith("/admin")) {
+    const basicAuth = request.headers.get("authorization")
 
-  // Handle admin routes separately from PWA
-  if (pathname.startsWith("/admin") || pathname.startsWith("/api/admin")) {
-    const response = NextResponse.next()
+    if (basicAuth) {
+      const auth = basicAuth.split(" ")[1]
+      const [user, pass] = Buffer.from(auth, "base64").toString().split(":")
 
-    // Remove PWA-related headers for admin routes
-    response.headers.delete("Service-Worker-Allowed")
-    response.headers.set("Cache-Control", "no-cache, no-store, must-revalidate")
-    response.headers.set("Pragma", "no-cache")
-    response.headers.set("Expires", "0")
+      // In a real application, you would securely compare these credentials
+      // For this demo, we're using simple environment variables
+      if (user === process.env.BASIC_AUTH_USER && pass === process.env.BASIC_AUTH_PASS) {
+        return NextResponse.next()
+      }
+    }
 
-    // Add security headers for admin routes
-    response.headers.set("X-Robots-Tag", "noindex, nofollow")
-    response.headers.set("X-Frame-Options", "DENY")
-    response.headers.set("X-Content-Type-Options", "nosniff")
-
-    return response
+    // If authentication fails or is missing, return a 401 Unauthorized response
+    return new NextResponse("Auth required", {
+      status: 401,
+      headers: {
+        "WWW-Authenticate": 'Basic realm="Secure Area"',
+      },
+    })
   }
 
-  // For PWA routes, ensure proper PWA headers
-  if (pathname.startsWith("/pwa") || pathname === "/") {
-    const response = NextResponse.next()
-    response.headers.set("Service-Worker-Allowed", "/")
-    return response
-  }
-
-  // For all other routes, allow normal PWA behavior
+  // Continue to the next middleware or route if not an admin path
   return NextResponse.next()
 }
 
 export const config = {
-  matcher: [
-    // Match admin routes
-    "/admin/:path*",
-    "/api/admin/:path*",
-    // Exclude static files and API routes that should remain cached
-    "/((?!_next/static|_next/image|favicon.ico|manifest.json|sw.js|service-worker.js).*)",
-  ],
+  matcher: ["/admin/:path*"], // Apply middleware to all routes under /admin
 }

@@ -1,4 +1,4 @@
-const CACHE_NAME = "infinite-bloom-v1"
+const CACHE_NAME = "infinite-bloom-cache-v1"
 const STATIC_CACHE = "infinite-bloom-static-v2"
 
 // Core app files
@@ -26,22 +26,46 @@ const FLIPBOOK_URLS = [
   "/slide_javascript/slideJS.js",
 ]
 
+const urlsToCache = APP_URLS.concat(FLIPBOOK_URLS)
+
 // Install event - cache all resources
 self.addEventListener("install", (event) => {
-  console.log("Service Worker installing...")
-  self.skipWaiting()
+  event.waitUntil(
+    caches.open(CACHE_NAME).then((cache) => {
+      console.log("Opened cache")
+      return cache.addAll(urlsToCache)
+    }),
+  )
 })
 
 // Activate event - clean up old caches
 self.addEventListener("activate", (event) => {
-  console.log("Service Worker activating...")
-  self.clients.claim()
+  const cacheWhitelist = [CACHE_NAME, STATIC_CACHE]
+  event.waitUntil(
+    caches.keys().then((cacheNames) => {
+      return Promise.all(
+        cacheNames.map((cacheName) => {
+          if (cacheWhitelist.indexOf(cacheName) === -1) {
+            return caches.delete(cacheName)
+          }
+        }),
+      )
+    }),
+  )
 })
 
 // Fetch event - serve from cache, fallback to network
 self.addEventListener("fetch", (event) => {
-  // Simple fetch handling - just pass through for now
-  event.respondWith(fetch(event.request))
+  event.respondWith(
+    caches.match(event.request).then((response) => {
+      // Cache hit - return response
+      if (response) {
+        return response
+      }
+      // No cache hit - fetch from network
+      return fetch(event.request)
+    }),
+  )
 })
 
 // Message event - handle cache updates

@@ -1,212 +1,139 @@
 "use client"
 
-import { useState, useEffect } from "react"
-import { useParams } from "next/navigation"
+import { useEffect, useState } from "react"
+import { useRouter, useSearchParams } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
-import { Loader2, CreditCard, DollarSign, Clock, Eye, Gift } from "lucide-react"
-import { PreviewViewer } from "@/components/preview-viewer"
+import { Loader2 } from "lucide-react"
 
 interface PurchaseLink {
   id: string
-  name: string
   slug: string
   price: number
   currency: string
   description: string
-  active: boolean
-  hasExpiration: boolean
-  expiresAt?: string
-  stripeEnabled: boolean
-  paypalEnabled: boolean
-  wiseEnabled: boolean
-  stripePriceId?: string
-  paypalLink?: string
-  wiseLink?: string
-  previewEnabled: boolean
-  previewPages: number[]
+  created_at: string
+  is_active: boolean
+  stripe_price_id?: string
+  paypal_link?: string
+  wise_link?: string
+  is_free: boolean
 }
 
-export default function PurchasePage() {
-  const params = useParams()
-  const linkId = params.linkId as string
-  const [purchaseLink, setPurchaseLink] = useState<PurchaseLink | null>(null)
+export default function PWABuyPage({ params }: { params: { linkId: string } }) {
+  const router = useRouter()
+  const searchParams = useSearchParams()
+  const [link, setLink] = useState<PurchaseLink | null>(null)
   const [loading, setLoading] = useState(true)
-  const [error, setError] = useState("")
-  const [showPreview, setShowPreview] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    if (linkId) {
-      loadPurchaseLink(linkId)
-    }
-  }, [linkId])
-
-  const loadPurchaseLink = async (slug: string) => {
-    setLoading(true)
-    setError("")
-
-    try {
-      // For demo purposes, return mock data based on slug
-      let mockLink: PurchaseLink
-
-      if (slug === "the-infinite-bloom") {
-        mockLink = {
-          id: "main",
-          name: "The Infinite Bloom - Standard",
-          slug: "the-infinite-bloom",
-          price: 19.99,
-          currency: "USD",
-          description:
-            "Experience a transformative journey through poetry and self-discovery. This digital collection includes 50+ pages of carefully curated poems, reflections, and interactive elements designed to inspire personal growth.",
-          active: true,
-          hasExpiration: false,
-          stripeEnabled: true,
-          paypalEnabled: true,
-          wiseEnabled: true,
-          stripePriceId: "price_1234567890",
-          paypalLink: "https://paypal.me/demo-main-product",
-          wiseLink: "https://wise.com/pay/demo-main-product",
-          previewEnabled: true,
-          previewPages: [9, 10, 11, 12],
+    const fetchLink = async () => {
+      try {
+        const res = await fetch(`/api/payment/select?linkId=${params.linkId}`)
+        if (!res.ok) {
+          throw new Error("Failed to fetch purchase link")
         }
-      } else if (slug === "holiday-special") {
-        mockLink = {
-          id: "holiday",
-          name: "Holiday Special - 25% Off",
-          slug: "holiday-special",
-          price: 14.99,
-          currency: "USD",
-          description:
-            "Limited time holiday offer - Experience transformative poetry at a special price. Same content as the standard edition but with seasonal savings.",
-          active: true,
-          hasExpiration: true,
-          expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
-          stripeEnabled: true,
-          paypalEnabled: true,
-          wiseEnabled: false,
-          stripePriceId: "price_0987654321",
-          paypalLink: "https://paypal.me/demo-holiday-special",
-          previewEnabled: true,
-          previewPages: [1, 2, 9, 10],
-        }
-      } else if (slug === "free-preview") {
-        mockLink = {
-          id: "free",
-          name: "Free Preview Access",
-          slug: "free-preview",
-          price: 0.0,
-          currency: "USD",
-          description:
-            "Complimentary access to selected pages of The Infinite Bloom. Perfect for getting a taste of the transformative content before making a purchase.",
-          active: true,
-          hasExpiration: false,
-          stripeEnabled: false,
-          paypalEnabled: false,
-          wiseEnabled: false,
-          previewEnabled: true,
-          previewPages: [1, 2, 3, 4, 5],
-        }
-      } else {
-        throw new Error("Purchase link not found")
+        const data = await res.json()
+        setLink(data)
+      } catch (err: any) {
+        setError(err.message)
+      } finally {
+        setLoading(false)
       }
-
-      setPurchaseLink(mockLink)
-    } catch (err) {
-      setError("Purchase link not found or has expired")
-    } finally {
-      setLoading(false)
     }
-  }
+    fetchLink()
+  }, [params.linkId])
+
+  useEffect(() => {
+    const paymentStatus = searchParams.get("payment")
+    if (paymentStatus === "success") {
+      alert("Payment successful! You can now access the content.")
+      router.push("/pwa") // Redirect to PWA home or reader
+    } else if (paymentStatus === "cancelled") {
+      alert("Payment cancelled. You can try again.")
+    }
+  }, [searchParams, router])
 
   const handleStripeCheckout = async () => {
-    if (!purchaseLink?.stripePriceId) return
-
+    if (!link?.stripe_price_id) {
+      alert("Stripe is not configured for this link.")
+      return
+    }
     try {
-      const response = await fetch("/api/create-checkout-session", {
+      const res = await fetch("/api/create-checkout-session", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          priceId: purchaseLink.stripePriceId,
-          purchaseLinkId: purchaseLink.id,
-        }),
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ priceId: link.stripe_price_id }),
       })
-
-      const { url } = await response.json()
-      if (url) {
+      const { url, error } = await res.json()
+      if (error) {
+        alert(`Error: ${error}`)
+      } else if (url) {
         window.location.href = url
       }
     } catch (error) {
-      console.error("Stripe checkout error:", error)
-      alert("Failed to start checkout process")
+      console.error("Error initiating Stripe checkout:", error)
+      alert("Failed to initiate checkout. Please try again.")
     }
   }
 
-  const handlePayPalPayment = () => {
-    if (purchaseLink?.paypalLink) {
-      window.open(purchaseLink.paypalLink, "_blank")
-    }
-  }
+  const handleFreeAccess = async () => {
+    if (!link) return
 
-  const handleWisePayment = () => {
-    if (purchaseLink?.wiseLink) {
-      window.open(purchaseLink.wiseLink, "_blank")
-    }
-  }
+    try {
+      // Simulate creating a free access code and granting access
+      const res = await fetch("/api/create-payment", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          accessCodeId: link.id, // Use the link ID as a placeholder for the access code ID
+          customerEmail: "free_user@example.com", // Placeholder email
+          transactionId: `FREE-${Math.random().toString(36).substring(2, 10)}`,
+          amountPaid: 0,
+          currency: "USD",
+          paymentProcessor: "Free Access",
+        }),
+      })
 
-  const handleFreeAccess = () => {
-    // For free access, redirect directly to PWA with a demo code
-    window.location.href = "/pwa?code=FREE2024"
+      const data = await res.json()
+      if (data.success) {
+        // Store session token and redirect to PWA reader
+        localStorage.setItem("sessionToken", data.accessCode.code)
+        router.push("/pwa/reader")
+      } else {
+        alert(`Failed to grant free access: ${data.message || data.error}`)
+      }
+    } catch (error) {
+      console.error("Error granting free access:", error)
+      alert("Failed to grant free access. Please try again.")
+    }
   }
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <Loader2 className="w-8 h-8 animate-spin mx-auto mb-4" />
-          <p className="text-gray-600">Loading purchase details...</p>
-        </div>
+      <div className="flex min-h-screen items-center justify-center bg-gray-100">
+        <Loader2 className="h-10 w-10 animate-spin text-gray-500" />
       </div>
     )
   }
 
-  if (error || !purchaseLink) {
+  if (error || !link || !link.is_active) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
-        <Card className="w-full max-w-md">
-          <CardContent className="text-center p-8">
-            <h1 className="text-2xl font-bold text-gray-900 mb-4">Not Found</h1>
-            <p className="text-gray-600 mb-6">{error || "This purchase link is not available."}</p>
-            <Button onClick={() => (window.location.href = "/")}>Return Home</Button>
-          </CardContent>
-        </Card>
-      </div>
-    )
-  }
-
-  if (!purchaseLink.active) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
-        <Card className="w-full max-w-md">
-          <CardContent className="text-center p-8">
-            <h1 className="text-2xl font-bold text-gray-900 mb-4">Unavailable</h1>
-            <p className="text-gray-600 mb-6">This purchase link is currently inactive.</p>
-            <Button onClick={() => (window.location.href = "/")}>Return Home</Button>
-          </CardContent>
-        </Card>
-      </div>
-    )
-  }
-
-  if (purchaseLink.hasExpiration && purchaseLink.expiresAt && new Date(purchaseLink.expiresAt) < new Date()) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
-        <Card className="w-full max-w-md">
-          <CardContent className="text-center p-8">
-            <Clock className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-            <h1 className="text-2xl font-bold text-gray-900 mb-4">Expired</h1>
-            <p className="text-gray-600 mb-6">This purchase link has expired.</p>
-            <Button onClick={() => (window.location.href = "/")}>Return Home</Button>
+      <div className="flex min-h-screen items-center justify-center bg-gray-100 p-4">
+        <Card className="w-full max-w-md text-center">
+          <CardHeader>
+            <CardTitle className="text-3xl font-bold">Link Not Found</CardTitle>
+            <CardDescription className="mt-2 text-lg text-red-600">
+              The purchase link is invalid or inactive.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Button onClick={() => router.push("/")}>Go to Homepage</Button>
           </CardContent>
         </Card>
       </div>
@@ -214,152 +141,57 @@ export default function PurchasePage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="max-w-4xl mx-auto px-4 py-8">
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-          {/* Product Information */}
-          <div className="space-y-6">
-            <Card>
-              <CardHeader>
-                <div className="flex items-center justify-between">
-                  <CardTitle className="text-2xl">{purchaseLink.name}</CardTitle>
-                  {purchaseLink.hasExpiration && purchaseLink.expiresAt && (
-                    <Badge variant="outline" className="flex items-center space-x-1">
-                      <Clock className="w-3 h-3" />
-                      <span>Expires {new Date(purchaseLink.expiresAt).toLocaleDateString()}</span>
-                    </Badge>
-                  )}
-                </div>
-                <CardDescription className="text-lg">{purchaseLink.description}</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="flex items-center justify-between mb-6">
-                  <div className="flex items-center space-x-2">
-                    <DollarSign className="w-6 h-6 text-green-600" />
-                    <span className="text-3xl font-bold">
-                      {purchaseLink.price === 0 ? "FREE" : `$${purchaseLink.price.toFixed(2)}`}
-                    </span>
-                    {purchaseLink.price > 0 && <span className="text-gray-500">{purchaseLink.currency}</span>}
-                  </div>
-                </div>
+    <div className="flex min-h-screen items-center justify-center bg-gray-100 p-4">
+      <Card className="w-full max-w-md">
+        <CardHeader className="text-center">
+          <CardTitle className="text-3xl font-bold">{link.slug}</CardTitle>
+          <CardDescription className="mt-2 text-lg text-gray-600">{link.description}</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-6 p-6">
+          {link.is_free ? (
+            <div className="text-center">
+              <p className="text-2xl font-semibold text-green-600">Free Access</p>
+              <Button onClick={handleFreeAccess} className="mt-6 w-full py-3 text-lg">
+                Get Free Access
+              </Button>
+            </div>
+          ) : (
+            <>
+              <div className="text-center">
+                <p className="text-4xl font-extrabold text-gray-900">
+                  ${link.price.toFixed(2)}{" "}
+                  <span className="text-xl font-semibold text-gray-500">{link.currency.toUpperCase()}</span>
+                </p>
+              </div>
 
-                {purchaseLink.previewEnabled && (
-                  <div className="mb-6">
-                    <Button
-                      variant="outline"
-                      onClick={() => setShowPreview(true)}
-                      className="w-full flex items-center space-x-2"
-                    >
-                      <Eye className="w-4 h-4" />
-                      <span>Preview Content</span>
-                    </Button>
-                  </div>
-                )}
-
-                <div className="space-y-4">
-                  <h3 className="font-semibold text-lg">What's Included:</h3>
-                  <ul className="space-y-2 text-gray-600">
-                    <li>• 50+ pages of transformative poetry</li>
-                    <li>• Interactive reflection exercises</li>
-                    <li>• Personal growth insights</li>
-                    <li>• Offline reading capability</li>
-                    <li>• Multi-device access (up to 3 devices)</li>
-                  </ul>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-
-          {/* Payment Options */}
-          <div className="space-y-6">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center space-x-2">
-                  {purchaseLink.price === 0 ? (
-                    <>
-                      <Gift className="w-5 h-5" />
-                      <span>Get Free Access</span>
-                    </>
-                  ) : (
-                    <>
-                      <CreditCard className="w-5 h-5" />
-                      <span>Choose Payment Method</span>
-                    </>
-                  )}
-                </CardTitle>
-                <CardDescription>
-                  {purchaseLink.price === 0
-                    ? "Click below to get instant free access"
-                    : "Select your preferred payment option"}
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                {purchaseLink.price === 0 ? (
-                  <Button onClick={handleFreeAccess} className="w-full" size="lg">
-                    <Gift className="w-4 h-4 mr-2" />
-                    Get Free Access
+              <div className="space-y-4">
+                {link.stripe_price_id && (
+                  <Button onClick={handleStripeCheckout} className="w-full py-3 text-lg">
+                    Pay with Card (Stripe)
                   </Button>
-                ) : (
-                  <>
-                    {purchaseLink.stripeEnabled && (
-                      <Button onClick={handleStripeCheckout} className="w-full" size="lg">
-                        <CreditCard className="w-4 h-4 mr-2" />
-                        Pay with Card (Stripe)
-                      </Button>
-                    )}
-
-                    {purchaseLink.paypalEnabled && (
-                      <Button
-                        onClick={handlePayPalPayment}
-                        variant="outline"
-                        className="w-full bg-transparent"
-                        size="lg"
-                      >
-                        Pay with PayPal
-                      </Button>
-                    )}
-
-                    {purchaseLink.wiseEnabled && (
-                      <Button onClick={handleWisePayment} variant="outline" className="w-full bg-transparent" size="lg">
-                        Pay with Wise
-                      </Button>
-                    )}
-                  </>
                 )}
-
-                <div className="text-center text-sm text-gray-500 mt-4">
-                  <p>Secure payment • Instant access • 30-day guarantee</p>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-lg">Frequently Asked Questions</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div>
-                  <h4 className="font-medium">How many devices can I use?</h4>
-                  <p className="text-sm text-gray-600">Up to 3 devices with your access code.</p>
-                </div>
-                <div>
-                  <h4 className="font-medium">Can I read offline?</h4>
-                  <p className="text-sm text-gray-600">Yes, content is available offline after first download.</p>
-                </div>
-                <div>
-                  <h4 className="font-medium">What if I have issues?</h4>
-                  <p className="text-sm text-gray-600">Contact support for help with access or technical issues.</p>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-        </div>
-      </div>
-
-      {/* Preview Modal */}
-      {showPreview && purchaseLink.previewEnabled && (
-        <PreviewViewer pages={purchaseLink.previewPages} onClose={() => setShowPreview(false)} />
-      )}
+                {link.paypal_link && (
+                  <Button asChild variant="outline" className="w-full py-3 text-lg bg-transparent">
+                    <a href={link.paypal_link} target="_blank" rel="noopener noreferrer">
+                      Pay with PayPal
+                    </a>
+                  </Button>
+                )}
+                {link.wise_link && (
+                  <Button asChild variant="outline" className="w-full py-3 text-lg bg-transparent">
+                    <a href={link.wise_link} target="_blank" rel="noopener noreferrer">
+                      Pay with Wise
+                    </a>
+                  </Button>
+                )}
+                {!link.stripe_price_id && !link.paypal_link && !link.wise_link && (
+                  <p className="text-center text-red-500">No payment methods configured for this link.</p>
+                )}
+              </div>
+            </>
+          )}
+        </CardContent>
+      </Card>
     </div>
   )
 }

@@ -1,90 +1,27 @@
-import { type NextRequest, NextResponse } from "next/server"
-import { EnhancedDatabaseService } from "@/lib/enhanced-database"
+import { NextResponse } from "next/server"
+import { createClient } from "@/lib/supabase"
 
-export async function POST(request: NextRequest) {
+export async function GET(request: Request) {
+  const { searchParams } = new URL(request.url)
+  const linkId = searchParams.get("linkId")
+
+  if (!linkId) {
+    return NextResponse.json({ error: "Link ID is required" }, { status: 400 })
+  }
+
+  const supabase = createClient()
+
   try {
-    const { purchaseLinkSlug, processor } = await request.json()
-
-    if (!purchaseLinkSlug || !processor) {
-      return NextResponse.json({ error: "Missing required parameters" }, { status: 400 })
-    }
-
-    // Get purchase link details
-    const { data: purchaseLink, error } = await EnhancedDatabaseService.getPurchaseLinkBySlug(purchaseLinkSlug)
+    const { data: purchaseLink, error } = await supabase.from("purchase_links").select("*").eq("id", linkId).single()
 
     if (error || !purchaseLink) {
+      console.error("Error fetching purchase link:", error?.message || "Link not found")
       return NextResponse.json({ error: "Purchase link not found" }, { status: 404 })
     }
 
-    // Check if processor is enabled for this link
-    const processorEnabled = {
-      stripe: purchaseLink.stripe_enabled,
-      paypal: purchaseLink.paypal_enabled,
-      wise: purchaseLink.wise_enabled,
-    }
-
-    if (!processorEnabled[processor as keyof typeof processorEnabled]) {
-      return NextResponse.json({ error: "Payment processor not available for this offer" }, { status: 400 })
-    }
-
-    // Track the click
-    await EnhancedDatabaseService.trackLinkClick(purchaseLinkSlug, {
-      country: request.headers.get("cf-ipcountry") || undefined,
-      device_type: request.headers.get("user-agent")?.includes("Mobile") ? "mobile" : "desktop",
-    })
-
-    // Generate payment session based on processor
-    let paymentUrl = ""
-    let sessionData = {}
-
-    switch (processor) {
-      case "stripe":
-        // In production, create Stripe checkout session
-        paymentUrl = `/api/payment/stripe/checkout?link=${purchaseLinkSlug}`
-        sessionData = {
-          processor: "stripe",
-          amount: purchaseLink.price,
-          currency: purchaseLink.currency,
-        }
-        break
-
-      case "paypal":
-        // In production, create PayPal order
-        paymentUrl = `/api/payment/paypal/checkout?link=${purchaseLinkSlug}`
-        sessionData = {
-          processor: "paypal",
-          amount: purchaseLink.price,
-          currency: purchaseLink.currency,
-        }
-        break
-
-      case "wise":
-        // In production, create Wise payment
-        paymentUrl = `/api/payment/wise/checkout?link=${purchaseLinkSlug}`
-        sessionData = {
-          processor: "wise",
-          amount: purchaseLink.price,
-          currency: purchaseLink.currency,
-        }
-        break
-
-      default:
-        return NextResponse.json({ error: "Invalid payment processor" }, { status: 400 })
-    }
-
-    return NextResponse.json({
-      success: true,
-      paymentUrl,
-      sessionData,
-      purchaseLink: {
-        name: purchaseLink.name,
-        price: purchaseLink.price,
-        currency: purchaseLink.currency,
-        description: purchaseLink.description,
-      },
-    })
+    return NextResponse.json(purchaseLink, { status: 200 })
   } catch (error) {
-    console.error("Payment selection error:", error)
-    return NextResponse.json({ error: "Payment selection failed" }, { status: 500 })
+    console.error("Unexpected error in payment/select:", error)
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 })
   }
 }

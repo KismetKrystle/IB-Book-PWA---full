@@ -1,7 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server"
 import Stripe from "stripe"
-import { supabaseAdmin } from "@/lib/supabase"
-import { nanoid } from "nanoid"
+import { createClient } from "@/lib/supabase"
 import { Resend } from "resend"
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
@@ -10,77 +9,85 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
 
 const resend = new Resend(process.env.RESEND_API_KEY!)
 
-export async function POST(request: NextRequest) {
-  const body = await request.text()
-  const signature = request.headers.get("stripe-signature")
+const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET!
+
+export async function POST(req: NextRequest) {
+  const supabase = createClient()
+  const body = await req.text()
+  const signature = req.headers.get("stripe-signature")
 
   if (!signature) {
-    console.error("No Stripe signature found")
-    return NextResponse.json({ error: "No signature" }, { status: 400 })
+    return NextResponse.json({ error: "No Stripe signature header" }, { status: 400 })
   }
 
   let event: Stripe.Event
 
   try {
-    event = stripe.webhooks.constructEvent(body, signature, process.env.STRIPE_WEBHOOK_SECRET!)
-  } catch (err) {
-    console.error("Webhook signature verification failed:", err)
-    return NextResponse.json({ error: "Invalid signature" }, { status: 400 })
+    event = stripe.webhooks.constructEvent(body, signature, webhookSecret)
+  } catch (err: any) {
+    console.error(`Webhook Error: ${err.message}`)
+    return NextResponse.json({ error: `Webhook Error: ${err.message}` }, { status: 400 })
   }
 
-  // Handle the checkout.session.completed event
-  if (event.type === "checkout.session.completed") {
-    const session = event.data.object as Stripe.Checkout.Session
+  // Handle the event
+  switch (event.type) {
+    case "checkout.session.completed":
+      const session = event.data.object as Stripe.Checkout.Session
+      console.log(`Checkout session completed for session ID: ${session.id}`)
 
-    try {
-      // Check if we already processed this session to avoid duplicates
-      const { data: existingCode } = await supabaseAdmin
-        .from("access_codes")
+      // Retrieve customer details from the session
+      const customerEmail = session.customer_details?.email
+      const amountTotal = session.amount_total
+      const currency = session.currency
+      const paymentIntentId = session.payment_intent as string // Assuming payment_intent is always a string here
+
+      if (!customerEmail || amountTotal === null || currency === null || !paymentIntentId) {
+        console.error("Missing essential data in checkout.session.completed event.")
+        return NextResponse.json({ error: "Missing essential data" }, { status: 400 })
+      }
+
+      // Find the purchase link associated with the price ID
+      const priceId = session.line_items?.data[0]?.price?.id // Assuming single line item
+      if (!priceId) {
+        console.error("No price ID found in checkout session line items.")
+        return NextResponse.json({ error: "No price ID found" }, { status: 400 })
+      }
+
+      const { data: purchaseLink, error: linkError } = await supabase
+        .from("purchase_links")
         .select("id")
-        .eq("stripe_session_id", session.id)
+        .eq("stripe_price_id", priceId)
         .single()
 
-      if (existingCode) {
-        console.log(`Access code already exists for session ${session.id}`)
-        return NextResponse.json({ received: true })
+      if (linkError || !purchaseLink) {
+        console.error("Error finding purchase link for price ID:", linkError?.message || "Link not found")
+        return NextResponse.json({ error: "Purchase link not found for price ID" }, { status: 404 })
       }
 
-      // Generate unique access code
-      const accessCode = nanoid(10).toUpperCase()
-
-      // Get customer details
-      const customerEmail = session.customer_details?.email
-      const customerName = session.customer_details?.name
-      const amountPaid = session.amount_total ? session.amount_total / 100 : 0
-      const currency = session.currency?.toUpperCase() || "USD"
-
-      if (!customerEmail) {
-        console.error("No customer email found in session")
-        await logWebhookFailure(session.id, "No customer email found in session")
-        return NextResponse.json({ error: "No customer email" }, { status: 400 })
-      }
-
-      // Store access code in Supabase
-      const { data: newAccessCode, error: dbError } = await supabaseAdmin
+      // Create a new access code for the customer
+      const { data: newAccessCode, error: accessCodeError } = await supabase
         .from("access_codes")
         .insert({
-          email: customerEmail,
-          customer_name: customerName,
-          code: accessCode,
-          amount_paid: amountPaid,
-          currency: currency,
-          stripe_session_id: session.id,
-          used: false,
-          email_sent: false,
+          code: `STRIPE-${paymentIntentId.substring(0, 8).toUpperCase()}`, // Generate a unique code
+          purchase_link_id: purchaseLink.id,
+          is_active: true,
+          usage_limit: 1, // Typically 1 use for a direct purchase
+          customer_email: customerEmail,
+          transaction_id: paymentIntentId,
+          amount_paid: amountTotal / 100, // Convert cents to dollars
+          currency: currency.toUpperCase(),
+          payment_processor: "Stripe",
+          purchase_date: new Date().toISOString(),
         })
         .select()
         .single()
 
-      if (dbError) {
-        console.error("Database error:", dbError)
-        await logWebhookFailure(session.id, `Database error: ${dbError.message}`)
-        return NextResponse.json({ error: "Database error" }, { status: 500 })
+      if (accessCodeError || !newAccessCode) {
+        console.error("Error creating access code:", accessCodeError?.message || "Failed to create access code")
+        return NextResponse.json({ error: "Failed to create access code" }, { status: 500 })
       }
+
+      console.log("Access code created:", newAccessCode)
 
       // Send email with access code
       try {
@@ -115,7 +122,7 @@ export async function POST(request: NextRequest) {
                     <h2 style="color: #1f2937; margin: 0 0 20px 0; font-size: 24px;">Thank you for your purchase!</h2>
                     
                     <p style="color: #4b5563; margin: 0 0 20px 0; font-size: 16px; line-height: 1.6;">
-                      Hi ${customerName || "there"},
+                      Hi ${session.customer_details?.name || "there"},
                     </p>
                     
                     <p style="color: #4b5563; margin: 0 0 30px 0; font-size: 16px; line-height: 1.6;">
@@ -125,7 +132,7 @@ export async function POST(request: NextRequest) {
                     <!-- Access Code Box -->
                     <div style="background: linear-gradient(135deg, #f3f4f6 0%, #e5e7eb 100%); border: 2px solid #8b5cf6; border-radius: 12px; padding: 30px; text-align: center; margin: 30px 0;">
                       <p style="color: #6b7280; margin: 0 0 10px 0; font-size: 14px; font-weight: 600; text-transform: uppercase; letter-spacing: 1px;">Your Access Code</p>
-                      <div style="font-family: 'Courier New', monospace; font-size: 32px; font-weight: bold; color: #8b5cf6; letter-spacing: 4px; margin: 10px 0;">${accessCode}</div>
+                      <div style="font-family: 'Courier New', monospace; font-size: 32px; font-weight: bold; color: #8b5cf6; letter-spacing: 4px; margin: 10px 0;">${newAccessCode.code}</div>
                       <p style="color: #6b7280; margin: 10px 0 0 0; font-size: 12px;">Save this code - you'll need it to access your book</p>
                     </div>
 
@@ -142,7 +149,7 @@ export async function POST(request: NextRequest) {
 
                     <!-- CTA Button -->
                     <div style="text-align: center; margin: 40px 0;">
-                      <a href="${process.env.NEXT_PUBLIC_API_URL || "https://yourdomain.com"}/pwa?code=${accessCode}" 
+                      <a href="${process.env.NEXT_PUBLIC_API_URL || "https://yourdomain.com"}/pwa?code=${newAccessCode.code}" 
                          style="display: inline-block; background: linear-gradient(135deg, #8b5cf6 0%, #3b82f6 100%); color: white; text-decoration: none; padding: 16px 32px; border-radius: 8px; font-weight: 600; font-size: 16px; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);">
                         Open The Infinite Bloom App
                       </a>
@@ -196,7 +203,7 @@ export async function POST(request: NextRequest) {
         })
 
         // Mark email as sent
-        await supabaseAdmin.from("access_codes").update({ email_sent: true }).eq("id", newAccessCode.id)
+        await supabase.from("access_codes").update({ email_sent: true }).eq("id", newAccessCode.id)
 
         console.log("Email sent successfully:", emailResult.data?.id)
       } catch (emailError) {
@@ -204,26 +211,29 @@ export async function POST(request: NextRequest) {
         // Log email failure for monitoring
         await logEmailFailure(newAccessCode.id, customerEmail, (emailError as Error).message)
         // Mark email as failed but don't fail the webhook
-        await supabaseAdmin.from("access_codes").update({ email_sent: false }).eq("id", newAccessCode.id)
+        await supabase.from("access_codes").update({ email_sent: false }).eq("id", newAccessCode.id)
       }
 
-      console.log(`Successfully processed payment for ${customerEmail}, access code: ${accessCode}`)
+      console.log(`Successfully processed payment for ${customerEmail}, access code: ${newAccessCode.code}`)
       return NextResponse.json({ received: true })
-    } catch (error) {
-      console.error("Error processing webhook:", error)
-      await logWebhookFailure(session.id, (error as Error).message)
-      return NextResponse.json({ error: "Processing failed" }, { status: 500 })
-    }
+    case "payment_intent.succeeded":
+      const paymentIntent = event.data.object as Stripe.PaymentIntent
+      console.log(`PaymentIntent for ${paymentIntent.amount} was successful!`)
+      // Then define and call a function to fulfill the customer's purchase
+      break
+    // ... handle other event types
+    default:
+      console.log(`Unhandled event type ${event.type}`)
   }
 
-  // Return 200 for other event types
-  return NextResponse.json({ received: true })
+  // Return a 200 response to acknowledge receipt of the event
+  return NextResponse.json({ received: true }, { status: 200 })
 }
 
 // Helper function to log webhook failures
 async function logWebhookFailure(sessionId: string, errorMessage: string) {
   try {
-    await supabaseAdmin.from("webhook_failures").insert({
+    await createClient().from("webhook_failures").insert({
       event_type: "checkout.session.completed",
       stripe_session_id: sessionId,
       error_message: errorMessage,
@@ -238,7 +248,7 @@ async function logWebhookFailure(sessionId: string, errorMessage: string) {
 // Helper function to log email failures
 async function logEmailFailure(accessCodeId: string, customerEmail: string, errorMessage: string) {
   try {
-    await supabaseAdmin.from("email_failures").insert({
+    await createClient().from("email_failures").insert({
       access_code_id: accessCodeId,
       customer_email: customerEmail,
       error_message: errorMessage,

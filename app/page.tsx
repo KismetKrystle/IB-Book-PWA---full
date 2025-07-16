@@ -2,11 +2,12 @@
 
 import { useState, useEffect } from "react"
 import { useSearchParams } from "next/navigation"
+import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Loader2, BookOpen, Headphones, Infinity, Eye, EyeOff, Mail } from "lucide-react"
+import { Loader2, Eye, EyeOff, Mail } from "lucide-react"
 
 export default function HomePage() {
   const searchParams = useSearchParams()
@@ -73,7 +74,7 @@ export default function HomePage() {
     }
 
     // Redirect to admin dashboard as the main entry point
-    window.location.href = "/admin"
+    // window.location.href = "/admin"
   }, [searchParams])
 
   const handlePurchase = async () => {
@@ -160,61 +161,24 @@ export default function HomePage() {
 
   if (step === "landing") {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-sky-200 via-blue-100 to-purple-100 flex items-center justify-center p-4">
-        <Card className="w-full max-w-md shadow-2xl border-0 bg-white/90 backdrop-blur">
-          <CardHeader className="text-center space-y-4">
-            <div className="mx-auto w-24 h-24 bg-gradient-to-br from-purple-400 via-blue-400 to-teal-400 rounded-full flex items-center justify-center shadow-lg">
-              <Infinity className="w-12 h-12 text-white" />
-            </div>
-            <div>
-              <CardTitle className="text-2xl font-bold text-gray-800">The Infinite Bloom</CardTitle>
-              <CardDescription className="text-lg text-gray-600 mt-2">Evolving by Perspective</CardDescription>
-              <p className="text-sm text-gray-500 mt-1">by Kismet Krystle</p>
-            </div>
+      <div className="flex min-h-screen items-center justify-center bg-gray-100 p-4">
+        <Card className="w-full max-w-md text-center">
+          <CardHeader>
+            <CardTitle className="text-4xl font-bold">Infinite Bloom</CardTitle>
+            <CardDescription className="mt-2 text-lg text-gray-600">
+              Your journey into transformative poetry.
+            </CardDescription>
           </CardHeader>
-
-          <CardContent className="space-y-6">
-            <div className="flex items-center justify-center space-x-6 text-sm text-gray-600">
-              <div className="flex items-center space-x-2">
-                <BookOpen className="w-4 h-4" />
-                <span>45 Poems</span>
-              </div>
-              <div className="flex items-center space-x-2">
-                <Headphones className="w-4 h-4" />
-                <span>Audio Included</span>
-              </div>
-            </div>
-
-            <div className="text-center space-y-4">
-              <p className="text-gray-700">
-                Experience a transformative journey through poetry that evolves your perspective on life, love, and
-                consciousness.
-              </p>
-
-              <div className="bg-gradient-to-r from-purple-50 to-blue-50 p-4 rounded-lg">
-                <p className="text-2xl font-bold text-gray-800">$19.99</p>
-                <p className="text-sm text-gray-600">One-time purchase • Up to 3 devices • Lifetime offline access</p>
-              </div>
-            </div>
-
-            <Button
-              onClick={handlePurchase}
-              disabled={loading}
-              className="w-full bg-gradient-to-r from-purple-500 to-blue-500 hover:from-purple-600 hover:to-blue-600 text-white py-3 text-lg"
-            >
-              {loading ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Processing...
-                </>
-              ) : (
-                "Purchase & Read Now"
-              )}
-            </Button>
-
-            <div className="text-center">
-              <Button variant="link" onClick={() => setStep("access")} className="text-sm text-gray-500">
-                Already have an access code?
+          <CardContent className="space-y-4 p-6">
+            <p className="text-gray-700">
+              Access the digital flipbook by entering your unique access code or purchasing a link.
+            </p>
+            <div className="flex flex-col space-y-3">
+              <Button asChild className="w-full py-3 text-lg">
+                <Link href="/pwa">Enter Access Code</Link>
+              </Button>
+              <Button asChild variant="outline" className="w-full py-3 text-lg bg-transparent">
+                <Link href="/buy/main">Purchase Access</Link>
               </Button>
             </div>
           </CardContent>

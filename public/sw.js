@@ -1,4 +1,4 @@
-const CACHE_NAME = "infinite-bloom-v1"
+const CACHE_NAME = "infinite-bloom-cache-v1"
 const STATIC_CACHE_NAME = "infinite-bloom-static-v1"
 
 // Routes to exclude from PWA caching
@@ -12,6 +12,17 @@ function shouldExcludeFromCache(url) {
 // Static assets to cache
 const STATIC_ASSETS = ["/", "/pwa", "/pwa/reader", "/manifest.json", "/offline.html"]
 
+// URLs to cache
+const urlsToCache = [
+  "/",
+  "/pwa",
+  "/pwa/reader",
+  "/flipbook-viewer.html", // Your flipbook HTML file
+  // Add other critical assets here (CSS, JS bundles, images, fonts)
+  // Note: Dynamic content (like API responses) typically isn't cached here
+  // but rather handled by network-first or stale-while-revalidate strategies.
+]
+
 // Install event
 self.addEventListener("install", (event) => {
   event.waitUntil(
@@ -20,7 +31,8 @@ self.addEventListener("install", (event) => {
         return cache.addAll(STATIC_ASSETS)
       }),
       caches.open(CACHE_NAME).then((cache) => {
-        return cache.addAll(["/pwa/reader", "/flipbook-viewer.html"])
+        console.log("Opened cache")
+        return cache.addAll(urlsToCache)
       }),
     ]),
   )
@@ -29,11 +41,12 @@ self.addEventListener("install", (event) => {
 
 // Activate event
 self.addEventListener("activate", (event) => {
+  const cacheWhitelist = [CACHE_NAME, STATIC_CACHE_NAME]
   event.waitUntil(
     caches.keys().then((cacheNames) => {
       return Promise.all(
         cacheNames.map((cacheName) => {
-          if (cacheName !== CACHE_NAME && cacheName !== STATIC_CACHE_NAME) {
+          if (cacheWhitelist.indexOf(cacheName) === -1) {
             return caches.delete(cacheName)
           }
         }),

@@ -259,3 +259,6 @@ BEGIN
   RETURN deleted_count;
 END;
 $$ LANGUAGE plpgsql;
+
+-- No new functions needed for schema changes in 04-enhanced-tables.sql
+-- This file is kept for consistency in script numbering.

@@ -55,3 +55,24 @@ BEGIN
   RETURN deleted_count;
 END;
 $$ LANGUAGE plpgsql;
+
+-- Function to update updated_at timestamp
+CREATE OR REPLACE FUNCTION update_updated_at_column()
+RETURNS TRIGGER AS $$
+BEGIN
+    NEW.updated_at = NOW();
+    RETURN NEW;
+END;
+$$ language 'plpgsql';
+
+-- Trigger for access_codes table
+CREATE TRIGGER update_access_codes_updated_at
+BEFORE UPDATE ON access_codes
+FOR EACH ROW
+EXECUTE FUNCTION update_updated_at_column();
+
+-- Trigger for purchase_links table
+CREATE TRIGGER update_purchase_links_updated_at
+BEFORE UPDATE ON purchase_links
+FOR EACH ROW
+EXECUTE FUNCTION update_updated_at_column();

@@ -3,6 +3,7 @@ DROP TABLE IF EXISTS analytics CASCADE;
 DROP TABLE IF EXISTS user_sessions CASCADE;
 DROP TABLE IF EXISTS access_codes CASCADE;
 DROP TABLE IF EXISTS purchase_links CASCADE;
+DROP TABLE IF EXISTS payment_transactions CASCADE;
 
 -- Enhanced access_codes table with customer and payment data
 CREATE TABLE access_codes (
@@ -52,6 +53,19 @@ CREATE TABLE purchase_links (
   stripe_enabled BOOLEAN DEFAULT true,
   paypal_enabled BOOLEAN DEFAULT true,
   wise_enabled BOOLEAN DEFAULT true,
+  
+  -- Stripe Price ID
+  stripe_price_id TEXT UNIQUE,
+  
+  -- Payment Method Flags
+  paypal_link TEXT,
+  wise_link TEXT,
+  
+  -- Is Free Flag
+  is_free BOOLEAN DEFAULT FALSE,
+  
+  -- Preview Pages
+  preview_pages INT[], -- Array of integers for page numbers
   
   -- Tracking
   clicks INTEGER DEFAULT 0,

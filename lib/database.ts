@@ -1,5 +1,9 @@
 import { supabase, supabaseAdmin, type AccessCode, type PurchaseLink } from "./supabase"
 
+// This file is intentionally left blank or contains minimal content
+// as the primary database interaction logic has been moved to lib/supabase.ts
+// and specific API routes.
+
 export class DatabaseService {
   // Access Code Management
   static async createAccessCode(data: {

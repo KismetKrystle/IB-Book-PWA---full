@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from "react"
 import { useRouter } from "next/navigation"
 import { format } from "date-fns"
 import { CalendarIcon, Copy, Edit, Trash, QrCode, PlusCircle, Eye, EyeOff } from "lucide-react"
-import { QRCode } from "qrcode.react" // Assuming you have this installed or will install it
+import QRCode from "qrcode.react" // Reverting to default import
 
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"

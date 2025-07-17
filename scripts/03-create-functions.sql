@@ -1,78 +1,134 @@
--- Function to increment purchase link clicks
-CREATE OR REPLACE FUNCTION increment_link_clicks(link_slug TEXT)
-RETURNS void AS $$
-BEGIN
-  UPDATE purchase_links 
-  SET clicks = clicks + 1 
-  WHERE slug = link_slug AND active = true;
-END;
-$$ LANGUAGE plpgsql;
-
--- Function to increment purchase link purchases
-CREATE OR REPLACE FUNCTION increment_link_purchases(link_slug TEXT)
-RETURNS void AS $$
-BEGIN
-  UPDATE purchase_links 
-  SET purchases = purchases + 1 
-  WHERE slug = link_slug AND active = true;
-END;
-$$ LANGUAGE plpgsql;
-
--- Function to get analytics summary
-CREATE OR REPLACE FUNCTION get_analytics_summary(days_back INTEGER DEFAULT 30)
-RETURNS TABLE(
-  total_visits BIGINT,
-  total_purchases BIGINT,
-  total_revenue NUMERIC,
-  conversion_rate NUMERIC
-) AS $$
-BEGIN
-  RETURN QUERY
-  SELECT 
-    COALESCE(SUM(pl.clicks), 0) as total_visits,
-    COALESCE(SUM(pl.purchases), 0) as total_purchases,
-    COALESCE(SUM(pl.purchases * pl.price), 0) as total_revenue,
-    CASE 
-      WHEN SUM(pl.clicks) > 0 THEN 
-        ROUND((SUM(pl.purchases)::NUMERIC / SUM(pl.clicks)::NUMERIC) * 100, 2)
-      ELSE 0 
-    END as conversion_rate
-  FROM purchase_links pl
-  WHERE pl.created_at >= NOW() - INTERVAL '1 day' * days_back;
-END;
-$$ LANGUAGE plpgsql;
-
--- Function to clean up expired sessions
-CREATE OR REPLACE FUNCTION cleanup_expired_sessions()
-RETURNS INTEGER AS $$
+-- Function to generate a random access code
+CREATE OR REPLACE FUNCTION generate_access_code()
+RETURNS TEXT AS $$
 DECLARE
-  deleted_count INTEGER;
+    chars TEXT := 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+    result TEXT := '';
+    i INT := 0;
 BEGIN
-  DELETE FROM user_sessions 
-  WHERE expires_at < NOW();
-  
-  GET DIAGNOSTICS deleted_count = ROW_COUNT;
-  RETURN deleted_count;
+    FOR i IN 1..8 LOOP
+        result := result || SUBSTRING(chars, (random() * LENGTH(chars) + 1)::INT, 1);
+    END LOOP;
+    RETURN result;
 END;
 $$ LANGUAGE plpgsql;
 
--- Function to update updated_at timestamp
-CREATE OR REPLACE FUNCTION update_updated_at_column()
-RETURNS TRIGGER AS $$
+-- Function to increment link clicks and optionally record user data
+CREATE OR REPLACE FUNCTION increment_link_clicks(link_slug TEXT, user_data JSONB DEFAULT '{}'::JSONB)
+RETURNS VOID AS $$
+DECLARE
+    link_id UUID;
 BEGIN
-    NEW.updated_at = NOW();
-    RETURN NEW;
+    SELECT id INTO link_id FROM purchase_links WHERE slug = link_slug;
+
+    IF link_id IS NOT NULL THEN
+        UPDATE purchase_links
+        SET clicks = clicks + 1
+        WHERE id = link_id;
+
+        INSERT INTO analytics (event_type, purchase_link_id, metadata)
+        VALUES ('link_click', link_id, user_data);
+    END IF;
 END;
-$$ language 'plpgsql';
+$$ LANGUAGE plpgsql;
 
--- Trigger for access_codes table
-CREATE TRIGGER update_access_codes_updated_at
-BEFORE UPDATE ON access_codes
-FOR EACH ROW
-EXECUTE FUNCTION update_updated_at_column();
+-- Function to increment link purchases and revenue
+CREATE OR REPLACE FUNCTION increment_link_purchases_and_revenue(link_id UUID, amount NUMERIC)
+RETURNS VOID AS $$
+BEGIN
+    UPDATE purchase_links
+    SET
+        purchases = purchases + 1,
+        revenue = revenue + amount
+    WHERE id = link_id;
+END;
+$$ LANGUAGE plpgsql;
 
--- Trigger for purchase_links table
-CREATE TRIGGER update_purchase_links_updated_at
-BEFORE UPDATE ON purchase_links
-FOR EACH ROW
-EXECUTE FUNCTION update_updated_at_column();
+-- Function to create a purchase access code and record payment transaction
+CREATE OR REPLACE FUNCTION create_purchase_access_code(
+    p_customer_name TEXT,
+    p_customer_email TEXT,
+    p_payment_processor TEXT,
+    p_transaction_id TEXT,
+    p_amount NUMERIC,
+    p_currency TEXT,
+    p_purchase_link_id UUID
+)
+RETURNS TABLE(code_id UUID, access_code TEXT) AS $$
+DECLARE
+    new_access_code_id UUID;
+    generated_code TEXT;
+BEGIN
+    -- Generate a unique access code
+    LOOP
+        generated_code := generate_access_code();
+        SELECT id INTO new_access_code_id FROM access_codes WHERE code = generated_code;
+        IF new_access_code_id IS NULL THEN
+            EXIT; -- Code is unique, exit loop
+        END IF;
+    END LOOP;
+
+    -- Insert the new access code
+    INSERT INTO access_codes (
+        code,
+        usage_limit,
+        current_usage,
+        is_active,
+        purchase_link_id,
+        customer_name,
+        customer_email,
+        transaction_id,
+        amount_paid,
+        currency,
+        payment_processor,
+        purchase_date,
+        type
+    )
+    VALUES (
+        generated_code,
+        1, -- Purchased codes typically have a usage limit of 1
+        0,
+        TRUE,
+        p_purchase_link_id,
+        p_customer_name,
+        p_customer_email,
+        p_transaction_id,
+        p_amount,
+        p_currency,
+        p_payment_processor,
+        NOW(),
+        'purchase'
+    )
+    RETURNING id INTO new_access_code_id;
+
+    -- Record the payment transaction
+    INSERT INTO payment_transactions (
+        transaction_id,
+        payment_processor,
+        status,
+        customer_email,
+        customer_name,
+        amount,
+        currency,
+        purchase_link_id,
+        access_code_id,
+        created_at,
+        completed_at
+    )
+    VALUES (
+        p_transaction_id,
+        p_payment_processor,
+        'completed', -- Assuming this function is called on successful payment
+        p_customer_email,
+        p_customer_name,
+        p_amount,
+        p_currency,
+        p_purchase_link_id,
+        new_access_code_id,
+        NOW(),
+        NOW()
+    );
+
+    RETURN QUERY SELECT new_access_code_id, generated_code;
+END;
+$$ LANGUAGE plpgsql;

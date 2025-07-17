@@ -68,8 +68,8 @@ CREATE TABLE purchase_links (
   preview_pages INT[], -- Array of integers for page numbers
   
   -- Tracking
-  clicks INTEGER DEFAULT 0,
-  purchases INTEGER DEFAULT 0,
+  clicks BIGINT DEFAULT 0,
+  purchases BIGINT DEFAULT 0,
   revenue DECIMAL(12,2) DEFAULT 0,
   
   -- Status

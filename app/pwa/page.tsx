@@ -37,6 +37,7 @@ export default function PWAHomePage() {
   const [error, setError] = useState("")
   const [demoMode, setDemoMode] = useState(false)
   const [defaultLink, setDefaultLink] = useState<PurchaseLink | null>(null)
+  const [deviceFingerprint, setDeviceFingerprint] = useState("")
 
   // Available purchase links as buttons
   const [purchaseLinks] = useState<PurchaseLink[]>([
@@ -123,6 +124,17 @@ export default function PWAHomePage() {
       setLoading(false)
     }
 
+    // Generate a simple device fingerprint on component mount
+    // In a real app, this would be more robust and persistent (e.g., using IndexedDB)
+    const fp = localStorage.getItem("deviceFingerprint")
+    if (fp) {
+      setDeviceFingerprint(fp)
+    } else {
+      const newFp = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15)
+      localStorage.setItem("deviceFingerprint", newFp)
+      setDeviceFingerprint(newFp)
+    }
+
     // Try to register service worker, but don't fail if it doesn't work
     if ("serviceWorker" in navigator && typeof window !== "undefined") {
       setTimeout(() => {
@@ -159,7 +171,7 @@ export default function PWAHomePage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           accessCode: accessCode.trim().toUpperCase(),
-          deviceFingerprint: Math.random().toString(36).substring(2, 15),
+          deviceFingerprint: deviceFingerprint,
         }),
       })
 

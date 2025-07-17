@@ -1,24 +1,15 @@
 "use client"
 
-import { useState, useEffect } from "react"
-
-const MOBILE_BREAKPOINT = 768
+import * as React from "react"
 
 export function useIsMobile() {
-  const [isMobile, setIsMobile] = useState<boolean | undefined>(undefined)
+  const [isMobile, setIsMobile] = React.useState(false)
 
-  useEffect(() => {
-    const checkMobile = () => {
-      setIsMobile(window.innerWidth < MOBILE_BREAKPOINT)
-    }
-
-    checkMobile() // Check on mount
-    window.addEventListener("resize", checkMobile) // Add event listener for resize
-
-    return () => {
-      window.removeEventListener("resize", checkMobile) // Clean up on unmount
-    }
+  React.useEffect(() => {
+    const userAgent = typeof navigator === "undefined" ? "" : navigator.userAgent
+    const mobile = Boolean(userAgent.match(/Android|BlackBerry|iPhone|iPad|iPod|Opera Mini|IEMobile|WPDesktop/i))
+    setIsMobile(mobile)
   }, [])
 
-  return !!isMobile
+  return isMobile
 }

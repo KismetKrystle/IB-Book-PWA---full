@@ -17,6 +17,7 @@ import {
 } from "@/components/ui/dialog"
 import { Separator } from "@/components/ui/separator"
 import { Switch } from "@/components/ui/switch"
+import { useTheme } from "next-themes"
 import {
   User,
   Mail,
@@ -36,17 +37,11 @@ import {
   Settings,
 } from "lucide-react"
 
-interface SettingsModalProps {
-  isOpen: boolean
-  onClose: () => void
-}
-
 interface UserData {
   email: string
   registeredAt: string
   lastAccess: string
   deviceCount: number
-  theme: "light" | "dark"
 }
 
 interface StorageInfo {
@@ -55,7 +50,9 @@ interface StorageInfo {
   lastSync: string
 }
 
-export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
+export function SettingsModal() {
+  const { theme, setTheme } = useTheme()
+  const [open, setOpen] = useState(false)
   const [userData, setUserData] = useState<UserData | null>(null)
   const [storageInfo, setStorageInfo] = useState<StorageInfo | null>(null)
   const [currentPassword, setCurrentPassword] = useState("")
@@ -64,24 +61,20 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
   const [showPasswords, setShowPasswords] = useState(false)
   const [loading, setLoading] = useState(false)
   const [message, setMessage] = useState("")
-  const [theme, setTheme] = useState<"light" | "dark">("light")
-  const [darkMode, setDarkMode] = useState(false) // Example setting
 
   useEffect(() => {
-    if (isOpen) {
+    if (open) {
       loadUserData()
       loadStorageInfo()
-      loadTheme()
     }
-  }, [isOpen])
+  }, [open])
 
   const loadUserData = () => {
     const email = localStorage.getItem("infiniteBloomEmail")
     const authExpiry = localStorage.getItem("infiniteBloomAuthExpiry")
     const lastAccess = localStorage.getItem("infiniteBloomLastAccess")
-    const token = localStorage.getItem("infiniteBloomToken")
 
-    if (email && token) {
+    if (email) {
       // Calculate registration date (approximate from auth expiry - 30 days)
       const expiryDate = new Date(authExpiry || Date.now())
       const registeredAt = new Date(expiryDate.getTime() - 30 * 24 * 60 * 60 * 1000)
@@ -91,7 +84,6 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
         registeredAt: registeredAt.toISOString(),
         lastAccess: lastAccess || new Date().toISOString(),
         deviceCount: 1, // Current device (in production, this would come from database)
-        theme: theme,
       })
     }
   }
@@ -113,28 +105,6 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
       offlineStatus,
       lastSync: new Date().toISOString(),
     })
-  }
-
-  const loadTheme = () => {
-    const savedTheme = (localStorage.getItem("infiniteBloomTheme") as "light" | "dark") || "light"
-    setTheme(savedTheme)
-    applyTheme(savedTheme)
-  }
-
-  const applyTheme = (newTheme: "light" | "dark") => {
-    if (newTheme === "dark") {
-      document.documentElement.classList.add("dark")
-    } else {
-      document.documentElement.classList.remove("dark")
-    }
-  }
-
-  const handleThemeChange = (newTheme: "light" | "dark") => {
-    setTheme(newTheme)
-    localStorage.setItem("infiniteBloomTheme", newTheme)
-    applyTheme(newTheme)
-    setMessage("Theme updated successfully!")
-    setTimeout(() => setMessage(""), 3000)
   }
 
   const handlePasswordChange = async () => {
@@ -186,7 +156,6 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
         "infiniteBloomEmail",
         "infiniteBloomPassword",
         "infiniteBloomAuthExpiry",
-        "infiniteBloomTheme",
       ]
 
       const itemsToKeep: { [key: string]: string } = {}
@@ -242,18 +211,12 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
     }
   }
 
-  const handleDarkModeChange = (checked: boolean) => {
-    setDarkMode(checked)
-    // Implement actual dark mode toggle logic here (e.g., add/remove class from <html>)
-    document.documentElement.classList.toggle("dark", checked)
-  }
-
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
+    <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button variant="ghost" size="sm">
-          <Settings className="h-4 w-4" />
-          <span className="sr-only">Settings</span>
+        <Button variant="ghost" size="icon" className="fixed bottom-4 right-4 z-50 shadow-lg">
+          <Settings className="h-6 w-6" />
+          <span className="sr-only">Open settings</span>
         </Button>
       </DialogTrigger>
       <DialogContent className="sm:max-w-[600px] max-h-[80vh] overflow-y-auto">
@@ -400,7 +363,7 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                   <div className="flex gap-3">
                     <Button
                       variant={theme === "light" ? "default" : "outline"}
-                      onClick={() => handleThemeChange("light")}
+                      onClick={() => setTheme("light")}
                       className="flex items-center gap-2"
                     >
                       <Sun className="w-4 h-4" />
@@ -408,7 +371,7 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                     </Button>
                     <Button
                       variant={theme === "dark" ? "default" : "outline"}
-                      onClick={() => handleThemeChange("dark")}
+                      onClick={() => setTheme("dark")}
                       className="flex items-center gap-2"
                     >
                       <Moon className="w-4 h-4" />
@@ -422,7 +385,11 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                 <div className="space-y-3">
                   <Label className="text-sm font-medium">Dark Mode</Label>
                   <div className="flex gap-3">
-                    <Switch id="darkMode" checked={darkMode} onCheckedChange={handleDarkModeChange} />
+                    <Switch
+                      id="darkMode"
+                      checked={theme === "dark"}
+                      onCheckedChange={(checked) => setTheme(checked ? "dark" : "light")}
+                    />
                   </div>
                 </div>
 
@@ -570,7 +537,7 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
         </Tabs>
 
         <div className="flex justify-end pt-4 border-t">
-          <Button onClick={onClose} variant="outline">
+          <Button onClick={() => setOpen(false)} variant="outline">
             Close Settings
           </Button>
         </div>

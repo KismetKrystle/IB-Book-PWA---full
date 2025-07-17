@@ -171,7 +171,7 @@ export class EnhancedDatabaseService {
 
       if (error) throw error
 
-      return { data, error: null }
+      return { data: data as EnhancedAccessCode, error: null }
     } catch (error) {
       return { data: null, error: (error as Error).message }
     }
@@ -348,7 +348,7 @@ export class EnhancedDatabaseService {
 
       if (error) throw error
 
-      return { data, error: null }
+      return { data: data as EnhancedPurchaseLink, error: null }
     } catch (error) {
       return { data: null, error: (error as Error).message }
     }
@@ -367,7 +367,7 @@ export class EnhancedDatabaseService {
 
       if (error) throw error
 
-      return { data, error: null }
+      return { data: data as EnhancedPurchaseLink, error: null }
     } catch (error) {
       return { data: null, error: (error as Error).message }
     }

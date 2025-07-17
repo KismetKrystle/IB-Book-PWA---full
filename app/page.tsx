@@ -161,28 +161,40 @@ export default function HomePage() {
 
   if (step === "landing") {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-gray-100 p-4">
-        <Card className="w-full max-w-md text-center">
-          <CardHeader>
-            <CardTitle className="text-4xl font-bold">Infinite Bloom</CardTitle>
-            <CardDescription className="mt-2 text-lg text-gray-600">
-              Your journey into transformative poetry.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4 p-6">
-            <p className="text-gray-700">
-              Access the digital flipbook by entering your unique access code or purchasing a link.
-            </p>
-            <div className="flex flex-col space-y-3">
-              <Button asChild className="w-full py-3 text-lg">
-                <Link href="/pwa">Enter Access Code</Link>
-              </Button>
-              <Button asChild variant="outline" className="w-full py-3 text-lg bg-transparent">
-                <Link href="/buy/main">Purchase Access</Link>
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
+      <div className="flex flex-col items-center justify-center min-h-screen bg-gradient-to-br from-purple-100 to-indigo-100 p-4 text-center">
+        <h1 className="text-5xl font-extrabold text-gray-900 mb-6 leading-tight">
+          Welcome to <span className="text-purple-700">Infinite Bloom</span>
+        </h1>
+        <p className="text-xl text-gray-700 mb-8 max-w-2xl">
+          Unlock a world of transformative poetry and immersive experiences.
+        </p>
+        <div className="flex flex-col sm:flex-row gap-4">
+          <Link href="/pwa" passHref>
+            <Button
+              size="lg"
+              className="bg-purple-600 hover:bg-purple-700 text-white text-lg px-8 py-3 rounded-full shadow-lg transition-all duration-300 ease-in-out transform hover:scale-105"
+            >
+              Launch App
+            </Button>
+          </Link>
+          <Link href="/buy/infinite-bloom-standard" passHref>
+            <Button
+              size="lg"
+              variant="outline"
+              className="border-purple-600 text-purple-600 hover:bg-purple-50 hover:text-purple-700 text-lg px-8 py-3 rounded-full shadow-lg transition-all duration-300 ease-in-out transform hover:scale-105 bg-transparent"
+            >
+              Buy Now
+            </Button>
+          </Link>
+        </div>
+        <div className="mt-12 text-gray-600 text-sm">
+          <p>
+            Are you an admin?{" "}
+            <Link href="/admin" className="text-purple-600 hover:underline">
+              Access Admin Dashboard
+            </Link>
+          </p>
+        </div>
       </div>
     )
   }

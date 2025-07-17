@@ -2,9 +2,12 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Infinite Bloom Flipbook Viewer</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+    <link rel="stylesheet" type="text/css" href="/style/style.css">
+    <link rel="stylesheet" type="text/css" href="/style/hiSlider2.min.css">
     <style>
         body, html {
             margin: 0;
@@ -105,100 +108,21 @@
             font-size: 0.9rem;
         }
 
-        .flipbook-container {
-            height: calc(100vh - 80px);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            padding: 2rem;
-        }
-
-        .flipbook {
-            width: 90%;
-            max-width: 1200px;
-            height: 80vh;
-            background: white;
-            border-radius: 15px;
-            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
-            overflow: hidden;
-            position: relative;
-        }
-
-        .page {
+        #flipbook-container {
             width: 100%;
             height: 100%;
-            display: none;
-            flex-direction: column;
+            display: flex;
             justify-content: center;
             align-items: center;
-            padding: 3rem;
-            text-align: center;
-            background: linear-gradient(135deg, #f7fafc 0%, #edf2f7 100%);
+            background-color: #f0f0f0; /* Light gray background */
         }
 
-        .page.active {
-            display: flex;
-        }
-
-        .page h2 {
-            font-size: 2.5rem;
-            color: #2d3748;
-            margin-bottom: 2rem;
-            font-weight: 300;
-        }
-
-        .page .poem {
-            font-size: 1.2rem;
-            line-height: 1.8;
-            color: #4a5568;
-            max-width: 600px;
-            font-style: italic;
-        }
-
-        .controls {
-            position: absolute;
-            bottom: 2rem;
-            left: 50%;
-            transform: translateX(-50%);
-            display: flex;
-            gap: 1rem;
-            z-index: 100;
-        }
-
-        .btn {
-            padding: 0.75rem 1.5rem;
-            background: rgba(255, 255, 255, 0.9);
-            border: none;
-            border-radius: 25px;
-            cursor: pointer;
-            font-size: 0.9rem;
-            font-weight: 500;
-            color: #2d3748;
-            transition: all 0.3s ease;
-            backdrop-filter: blur(10px);
-        }
-
-        .btn:hover {
-            background: rgba(255, 255, 255, 1);
-            transform: translateY(-2px);
-            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
-        }
-
-        .btn:disabled {
-            opacity: 0.5;
-            cursor: not-allowed;
-        }
-
-        .page-indicator {
-            position: absolute;
-            top: 2rem;
-            right: 2rem;
-            background: rgba(255, 255, 255, 0.9);
-            padding: 0.5rem 1rem;
-            border-radius: 20px;
-            font-size: 0.9rem;
-            color: #2d3748;
-            backdrop-filter: blur(10px);
+        #flipbook {
+            width: 100%;
+            height: 100%;
+            max-width: 1000px; /* Max width for the flipbook itself */
+            max-height: 700px; /* Max height for the flipbook itself */
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
         }
 
         @media (max-width: 768px) {
@@ -212,28 +136,10 @@
                 order: -1;
             }
 
-            .flipbook {
+            #flipbook {
                 width: 95%;
                 height: 70vh;
             }
-
-            .page {
-                padding: 2rem 1rem;
-            }
-
-            .page h2 {
-                font-size: 2rem;
-            }
-
-            .page .poem {
-                font-size: 1rem;
-            }
-        }
-
-        iframe {
-            width: 100%;
-            height: 100%;
-            border: none;
         }
     </style>
 </head>
@@ -255,11 +161,21 @@
         </div>
     </div>
 
-    <div class="flipbook-container">
-        <!-- This iframe will load your FlipHTML5 content -->
-        <!-- Replace 'YOUR_FLIPHTML5_EMBED_URL' with the actual embed URL provided by FlipHTML5 -->
-        <iframe src="https://online.fliphtml5.com/your-fliphtml5-content-embed-url/your-book-id/" allowFullScreen="true" allow="autoplay"></iframe>
+    <div id="flipbook-container">
+        <div id="flipbook"></div>
     </div>
+
+    <script src="/javascript/config.js"></script>
+    <script src="/javascript/LoadingJS.js"></script>
+    <script src="/javascript/deString.js"></script>
+    <script src="/javascript/jquery-3.7.1.min.js"></script>
+    <script src="/javascript/book.min.js"></script>
+    <script src="/javascript/pageItems.min.js"></script>
+    <script src="/javascript/main.min.js"></script>
+    <script src="/javascript/flipHtml5.hiSlider2.min.js"></script>
+    <script src="/files/pageEditor.js"></script>
+    <script src="/files/textSvgConfig.js"></script>
+    <script src="/slide_javascript/slideJS.js"></script>
 
     <script>
         let currentPageIndex = 0;
@@ -345,6 +261,22 @@
         // Initialize
         loadUserInfo();
         updatePageDisplay();
+
+        $(document).ready(function () {
+            // Initialize the flipbook
+            $("#flipbook").flipBook({
+                pdfUrl: "/files/shot.jpg", // Placeholder, replace with actual PDF or image sequence logic
+                // Other flipbook options can go here
+                // For example, to load images:
+                // pages: [
+                //   { src: "/files/page1.jpg", thumb: "/files/thumb1.jpg", title: "Page 1" },
+                //   { src: "/files/page2.jpg", thumb: "/files/thumb2.jpg", title: "Page 2" },
+                // ],
+                // Or if using a single image for demo:
+                pages: [{ src: "/files/shot.jpg", thumb: "/files/shot.jpg", title: "Demo Page" }],
+                // You might need to adjust paths and configuration based on your actual flipbook library setup
+            });
+        });
     </script>
 </body>
 </html>

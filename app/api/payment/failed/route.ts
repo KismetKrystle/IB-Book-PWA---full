@@ -1,51 +1,24 @@
 import { type NextRequest, NextResponse } from "next/server"
+import { DatabaseService } from "@/lib/database"
 
-export async function POST(request: NextRequest) {
-  try {
-    const { purchaseLinkId, customerEmail, customerName, paymentProcessor, failureReason, amount, currency } =
-      await request.json()
+export async function GET(request: NextRequest) {
+  const { searchParams } = new URL(request.url)
+  const sessionId = searchParams.get("session_id")
+  const purchaseLinkId = searchParams.get("purchase_link_id")
+  const customerEmail = searchParams.get("customer_email")
 
-    // Log the payment failure
-    const paymentFailure = {
-      id: Math.random().toString(36).substring(2, 15),
-      purchase_link_id: purchaseLinkId,
-      customer_email: customerEmail,
-      customer_name: customerName,
-      payment_processor: paymentProcessor,
-      failure_reason: failureReason,
-      amount: amount,
-      currency: currency || "USD",
-      retry_count: 0,
-      last_retry_at: null,
-      resolved: false,
-      created_at: new Date().toISOString(),
-    }
+  // In a real application, you would log this failure,
+  // potentially notify the customer, or trigger a retry mechanism.
+  console.error(`Payment failed for session: ${sessionId}, link: ${purchaseLinkId}, email: ${customerEmail}`)
 
-    // In a real implementation, you would:
-    // 1. Save to database
-    // 2. Send notification email to customer
-    // 3. Alert admin dashboard
-    // 4. Trigger retry mechanism if appropriate
-
-    console.log("Payment failure logged:", paymentFailure)
-
-    return NextResponse.json({
-      success: true,
-      message: "Payment failure logged successfully",
-      failureId: paymentFailure.id,
-      retryUrl: `/buy/${purchaseLinkId}?retry=true`,
+  // Optionally track the failure in your analytics
+  if (purchaseLinkId) {
+    await DatabaseService.trackEvent("payment_failed", {
+      purchaseLinkId,
+      userEmail: customerEmail || "unknown",
+      metadata: { sessionId },
     })
-  } catch (error) {
-    console.error("Failed to log payment failure:", error)
-    return NextResponse.json(
-      {
-        error: "Failed to log payment failure",
-      },
-      { status: 500 },
-    )
   }
-}
 
-export async function GET() {
-  return NextResponse.json({ message: "Payment failed or was cancelled." }, { status: 200 })
+  return NextResponse.json({ message: "Payment failed. Please try again." }, { status: 200 })
 }

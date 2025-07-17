@@ -1,58 +1,59 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { EnhancedDatabaseService } from "@/lib/enhanced-database"
+import { EnhancedDatabaseService, DatabaseService } from "@/lib/database"
 
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json()
-    const processor = request.headers.get("x-payment-processor") || body.processor
+    const payload = await request.json()
+    const eventType = payload.type
+    const processor = request.headers.get("x-payment-processor") || payload.processor
 
-    console.log(`Webhook received from ${processor}:`, body)
+    console.log(`Received webhook event: ${eventType} from ${processor}`)
 
     let transactionData = null
 
     // Parse webhook data based on processor
     switch (processor) {
       case "stripe":
-        if (body.type === "checkout.session.completed") {
+        if (payload.type === "checkout.session.completed") {
           transactionData = {
-            transaction_id: body.data.object.payment_intent,
+            transaction_id: payload.data.object.payment_intent,
             payment_processor: "stripe",
             status: "completed",
-            customer_email: body.data.object.customer_details.email,
-            customer_name: body.data.object.customer_details.name,
-            amount: body.data.object.amount_total / 100, // Stripe uses cents
-            currency: body.data.object.currency.toUpperCase(),
-            webhook_data: body,
+            customer_email: payload.data.object.customer_details.email,
+            customer_name: payload.data.object.customer_details.name,
+            amount: payload.data.object.amount_total / 100, // Stripe uses cents
+            currency: payload.data.object.currency.toUpperCase(),
+            webhook_data: payload,
           }
         }
         break
 
       case "paypal":
-        if (body.event_type === "CHECKOUT.ORDER.APPROVED") {
+        if (payload.event_type === "CHECKOUT.ORDER.APPROVED") {
           transactionData = {
-            transaction_id: body.resource.id,
+            transaction_id: payload.resource.id,
             payment_processor: "paypal",
             status: "completed",
-            customer_email: body.resource.payer.email_address,
-            customer_name: `${body.resource.payer.name.given_name} ${body.resource.payer.name.surname}`,
-            amount: Number.parseFloat(body.resource.purchase_units[0].amount.value),
-            currency: body.resource.purchase_units[0].amount.currency_code,
-            webhook_data: body,
+            customer_email: payload.resource.payer.email_address,
+            customer_name: `${payload.resource.payer.name.given_name} ${payload.resource.payer.name.surname}`,
+            amount: Number.parseFloat(payload.resource.purchase_units[0].amount.value),
+            currency: payload.resource.purchase_units[0].amount.currency_code,
+            webhook_data: payload,
           }
         }
         break
 
       case "wise":
-        if (body.data.resource.type === "transfer" && body.data.resource.status === "outgoing_payment_sent") {
+        if (payload.data.resource.type === "transfer" && payload.data.resource.status === "outgoing_payment_sent") {
           transactionData = {
-            transaction_id: body.data.resource.id.toString(),
+            transaction_id: payload.data.resource.id.toString(),
             payment_processor: "wise",
             status: "completed",
-            customer_email: body.data.resource.details.email,
-            customer_name: body.data.resource.details.name,
-            amount: body.data.resource.sourceValue,
-            currency: body.data.resource.sourceCurrency,
-            webhook_data: body,
+            customer_email: payload.data.resource.details.email,
+            customer_name: payload.data.resource.details.name,
+            amount: payload.data.resource.sourceValue,
+            currency: payload.data.resource.sourceCurrency,
+            webhook_data: payload,
           }
         }
         break
@@ -63,11 +64,11 @@ export async function POST(request: NextRequest) {
           transaction_id: `demo_${Date.now()}`,
           payment_processor: processor || "demo",
           status: "completed",
-          customer_email: body.customer_email || "demo@example.com",
-          customer_name: body.customer_name || "Demo Customer",
-          amount: body.amount || 19.99,
-          currency: body.currency || "USD",
-          webhook_data: body,
+          customer_email: payload.customer_email || "demo@example.com",
+          customer_name: payload.customer_name || "Demo Customer",
+          amount: payload.amount || 19.99,
+          currency: payload.currency || "USD",
+          webhook_data: payload,
         }
     }
 
@@ -84,39 +85,69 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Failed to process payment" }, { status: 500 })
     }
 
-    // Create access code for the customer
-    const { data: accessCode, error: codeError } = await EnhancedDatabaseService.createAccessCode({
-      type: "purchase",
-      customer_name: transactionData.customer_name,
-      customer_email: transactionData.customer_email,
-      payment_processor: transactionData.payment_processor as "stripe" | "paypal" | "wise",
-      transaction_id: transactionData.transaction_id,
-      amount_paid: transactionData.amount,
-      currency: transactionData.currency,
-      purchase_link_id: body.purchase_link_id,
-    })
+    switch (eventType) {
+      case "payment_succeeded":
+        // Example: Handle a successful payment event
+        const { paymentId, amount, currency, customerEmail, purchaseLinkId, transactionId } = payload.data // Assuming these fields are in your webhook payload
 
-    if (codeError || !accessCode) {
-      console.error("Failed to create access code:", codeError)
-      return NextResponse.json({ error: "Failed to generate access code" }, { status: 500 })
+        // Create an access code for the customer
+        const { data: accessCode, error: accessCodeError } = await DatabaseService.createAccessCode({
+          type: "purchase",
+          maxUses: 1, // Typically 1 use for a purchased code
+          customerEmail: customerEmail,
+          paymentId: paymentId,
+          notes: `Generated from successful payment for link ${purchaseLinkId}`,
+        })
+
+        if (accessCodeError) {
+          console.error("Error creating access code from webhook:", accessCodeError)
+          // Log this as a system failure to be reviewed manually
+          await DatabaseService.trackEvent("system_failure", {
+            eventType: "access_code_creation_failed",
+            metadata: {
+              webhookPayload: payload,
+              errorMessage: accessCodeError,
+            },
+          })
+          return NextResponse.json({ message: "Access code creation failed" }, { status: 500 })
+        }
+
+        // Increment purchase count for the link
+        if (purchaseLinkId) {
+          await DatabaseService.incrementPurchaseLinkPurchase(purchaseLinkId)
+          await DatabaseService.trackEvent("purchase_completed", {
+            purchaseLinkId,
+            accessCodeId: accessCode?.id,
+            userEmail: customerEmail,
+            metadata: { amount, currency, transactionId },
+          })
+        }
+
+        console.log(`Payment succeeded for ${customerEmail}. Access code: ${accessCode?.code}`)
+
+        // Update transaction with access code ID
+        await EnhancedDatabaseService.updatePaymentTransaction(transaction!.id, {
+          access_code_id: accessCode.id,
+          completed_at: new Date().toISOString(),
+        })
+
+        break
+      case "payment_failed":
+        // Example: Handle a failed payment event
+        console.error("Payment failed webhook received:", payload.data)
+        // Log this for review
+        await DatabaseService.trackEvent("payment_failed_webhook", {
+          metadata: { webhookPayload: payload },
+        })
+        break
+      // Add more cases for other event types as needed
+      default:
+        console.warn(`Unhandled webhook event type: ${eventType}`)
     }
 
-    // TODO: Send email with access code
-    console.log(`Access code ${accessCode.code} created for ${transactionData.customer_email}`)
-
-    // Update transaction with access code ID
-    await EnhancedDatabaseService.updatePaymentTransaction(transaction!.id, {
-      access_code_id: accessCode.id,
-      completed_at: new Date().toISOString(),
-    })
-
-    return NextResponse.json({
-      success: true,
-      access_code: accessCode.code,
-      transaction_id: transactionData.transaction_id,
-    })
+    return NextResponse.json({ received: true }, { status: 200 })
   } catch (error) {
-    console.error("Webhook processing error:", error)
-    return NextResponse.json({ error: "Webhook processing failed" }, { status: 500 })
+    console.error("Error processing webhook:", error)
+    return NextResponse.json({ message: "Error processing webhook" }, { status: 500 })
   }
 }

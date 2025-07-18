@@ -106,10 +106,10 @@ export class FinalDatabaseService {
 
         if (fetchError) throw fetchError
 
-        return { data: accessCode, error: null }
+        return { data: accessCode as FinalAccessCode, error: null }
       } else {
         // Generate simple code for manual/promotional codes
-        const code = this.generateSimpleCode()
+        const code = await this.generateUniqueCode() // Use the RPC for unique code generation
 
         const { data: accessCode, error } = await supabaseAdmin
           .from("access_codes")
@@ -128,7 +128,7 @@ export class FinalDatabaseService {
 
         if (error) throw error
 
-        return { data: accessCode, error: null }
+        return { data: accessCode as FinalAccessCode, error: null }
       }
     } catch (error) {
       return { data: null, error: (error as Error).message }
@@ -144,7 +144,7 @@ export class FinalDatabaseService {
 
       if (error) throw error
 
-      return { data, error: null }
+      return { data: data as FinalAccessCode, error: null }
     } catch (error) {
       return { data: null, error: (error as Error).message }
     }
@@ -293,7 +293,7 @@ export class FinalDatabaseService {
 
       if (error) throw error
 
-      return { data: purchaseLink, error: null }
+      return { data: purchaseLink as FinalPurchaseLink, error: null }
     } catch (error) {
       return { data: null, error: (error as Error).message }
     }
@@ -342,7 +342,7 @@ export class FinalDatabaseService {
 
       if (error) throw error
 
-      return { data, error: null }
+      return { data: data as FinalPurchaseLink, error: null }
     } catch (error) {
       return { data: null, error: (error as Error).message }
     }
@@ -380,7 +380,7 @@ export class FinalDatabaseService {
 
       if (fetchError) throw fetchError
 
-      return { data: failureRecord, error: null }
+      return { data: failureRecord as PaymentFailure, error: null }
     } catch (error) {
       return { data: null, error: (error as Error).message }
     }
@@ -465,12 +465,9 @@ export class FinalDatabaseService {
     return sessionToken
   }
 
-  private static generateSimpleCode(): string {
-    const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
-    let result = ""
-    for (let i = 0; i < 8; i++) {
-      result += chars.charAt(Math.floor(Math.random() * chars.length))
-    }
-    return result
+  private static async generateUniqueCode(): Promise<string> {
+    const { data, error } = await supabaseAdmin.rpc("generate_access_code")
+    if (error) throw error
+    return data
   }
 }
